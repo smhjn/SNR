@@ -53,11 +53,11 @@ using AstroData::readLOFAR;
 using isa::OpenCL::initializeOpenCL;
 using isa::OpenCL::GPUData;
 using isa::OpenCL::Memset;
-using TDM::getShifts;
-using TDM::dedisperse;
-using TDM::Folding;
-using TDM::pulsarSNR;
-using TDM::SNR;
+using PulsarSearch::getShifts;
+using PulsarSearch::dedisperse;
+using PulsarSearch::Folding;
+using PulsarSearch::pulsarSNR;
+using PulsarSearch::SNR;
 
 typedef float dataType;
 const string typeName("float");

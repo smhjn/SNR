@@ -31,7 +31,7 @@ using std::ceil;
 #ifndef SNR_PHI_HPP
 #define SNR_PHI_HPP
 
-namespace TDM {
+namespace PulsarSearch {
 
 // OpenMP SNR
 /*template< typename T > void transientSNR(Observation< T > & observation, CLData< T > * input, CLData< T > * output);*/
@@ -69,6 +69,6 @@ template< typename T > void pulsarSNR(const unsigned int nrDMs, const unsigned i
 	}
 }
 
-} // TDM
+} // PulsarSearch
 
 #endif // SNR_PHI_HPP

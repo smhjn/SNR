@@ -49,7 +49,7 @@ using isa::utils::Timer;
 using AstroData::Observation;
 using isa::OpenCL::initializeOpenCL;
 using isa::OpenCL::CLData;
-using TDM::SNR;
+using PulsarSearch::SNR;
 
 typedef float dataType;
 const string typeName("float");

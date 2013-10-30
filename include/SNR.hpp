@@ -39,7 +39,7 @@ using AstroData::Observation;
 #ifndef SNR_HPP
 #define SNR_HPP
 
-namespace TDM {
+namespace PulsarSearch {
 
 // OpenCL SNR
 template< typename T > class SNR : public Kernel< T > {
@@ -142,6 +142,6 @@ template< typename T >inline void SNR< T >::setObservation(Observation< T > *obs
 	observation = obs;
 }
 
-} // TDM
+} // PulsarSearch
 
 #endif // SNR_HPP

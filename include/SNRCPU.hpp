@@ -35,7 +35,7 @@ using AstroData::Observation;
 #ifndef SNR_CPU_HPP
 #define SNR_CPU_HPP
 
-namespace TDM {
+namespace PulsarSearch {
 
 // OpenMP SNR
 /*template< typename T > void transientSNR(Observation< T > & observation, CLData< T > * input, CLData< T > * output);*/
@@ -70,6 +70,6 @@ template< typename T > void pulsarSNR(const Observation< T > & observation, cons
 	}
 }
 
-} // TDM
+} // PulsarSearch
 
 #endif // SNR_CPU_HPP
