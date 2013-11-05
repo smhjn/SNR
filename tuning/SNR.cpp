@@ -54,7 +54,8 @@ using PulsarSearch::SNR;
 typedef float dataType;
 const string typeName("float");
 const unsigned int maxThreadsPerBlock = 1024;
-const unsigned int maxItemsPerThread = 256;
+const unsigned int maxThreadMultiplier = 512;
+const unsigned int padding = 32;
 
 // Common parameters
 const unsigned int nrBeams = 1;
@@ -70,7 +71,7 @@ const float channelBandwidth = 0.2929f;
 const unsigned int nrSamplesPerSecond = 20000;
 const unsigned int nrChannels = 1024;
 // Periods
-const unsigned int nrBins = 32;
+const unsigned int nrBins = 256;
 
 
 int main(int argc, char * argv[]) {
@@ -94,7 +95,7 @@ int main(int argc, char * argv[]) {
 	}
 
 	// Setup of the observation
-	observation.setPadding(32);
+	observation.setPadding(padding);
 	observation.setNrBins(nrBins);
 	
 	cl::Context * clContext = new cl::Context();
@@ -105,17 +106,17 @@ int main(int argc, char * argv[]) {
 	initializeOpenCL(clPlatformID, 1, clPlatforms, clContext, clDevices, clQueues);
 	
 	cout << fixed << endl;
-	cout << "# nrDMs nrPeriods nrPeriodsPerBlock GFLOP/s err time err GB/s err " << endl << endl;
+	cout << "# nrDMs nrPeriods nrDMsPerBlock nrPeriodsPerBlock GFLOP/s err time err GB/s err " << endl << endl;
 	
 	for ( unsigned int nrDMs = 2; nrDMs <= 4096; nrDMs *= 2 )	{
 		observation.setNrDMs(nrDMs);
 		
-		for ( unsigned int nrPeriods = 32; nrPeriods <= 1024; nrPeriods *= 2 ) {
+		for ( unsigned int nrPeriods = 2; nrPeriods <= 1024; nrPeriods *= 2 ) {
 			observation.setNrPeriods(nrPeriods);
 
 			// Allocate memory
-			foldedData->allocateHostData(observation.getNrDMs() * observation.getNrBins() * observation.getNrPaddedPeriods());
-			SNRData->allocateHostData(observation.getNrDMs() * observation.getNrPaddedPeriods());
+			foldedData->allocateHostData(observation.getNrPaddedDMs() * observation.getNrBins() * observation.getNrPeriods());
+			SNRData->allocateHostData(observation.getNrPaddedDMs() * observation.getNrPeriods());
 
 
 			foldedData->setCLContext(clContext);
@@ -132,59 +133,76 @@ int main(int argc, char * argv[]) {
 
 
 			// Find the parameters
+			vector< unsigned int > DMsPerBlock;
+			for ( unsigned int DMs = 2; DMs <= maxThreadsPerBlock; DMs++ ) {
+				if ( (observation.getNrDMs() % DMs) == 0 ) {
+					DMsPerBlock.push_back(DMs);
+				}
+			}
 			vector< unsigned int > periodsPerBlock;
-			for ( unsigned int periods = 32; periods <= maxThreadsPerBlock; periods += 32 ) {
+			for ( unsigned int periods = 2; periods <= maxThreadMultiplier; periods++ ) {
 				if ( (observation.getNrPeriods() % periods) == 0 ) {
 					periodsPerBlock.push_back(periods);
 				}
 			}
 
-			for ( vector< unsigned int >::iterator periods = periodsPerBlock.begin(); periods != periodsPerBlock.end(); periods++ ) {
-				double Acur[2] = {0.0, 0.0};
-				double Aold[2] = {0.0, 0.0};
-				double Vcur[2] = {0.0, 0.0};
-				double Vold[2] = {0.0, 0.0};
-
-				try {
-					// Generate kernel
-					SNR< dataType > clSNR("clSNRp" + toStringValue< unsigned int >(*periods), typeName);
-					clSNR.bindOpenCL(clContext, &(clDevices->at(clDeviceID)), &((clQueues->at(clDeviceID)).at(0)));
-					clSNR.setObservation(&observation);
-					clSNR.setNrPeriodsPerBlock(*periods);
-					clSNR.setPulsarPipeline();
-					clSNR.generateCode();
-
-					for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
-						clSNR(foldedData, SNRData);
-						
-						if ( iteration == 0 ) {
-							Acur[0] = clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime();
-							Acur[1] = clSNR.getGB() / clSNR.getTimer().getLastRunTime();
-						} else {
-							Aold[0] = Acur[0];
-							Vold[0] = Vcur[0];
-
-							Acur[0] = Aold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) / (iteration + 1));
-							Vcur[0] = Vold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) * ((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Acur[0]));
-
-							Aold[1] = Acur[1];
-							Vold[1] = Vcur[1];
-
-							Acur[1] = Aold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) / (iteration + 1));
-							Vcur[1] = Vold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) * ((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Acur[1]));
-						}
+			for ( vector< unsigned int >::iterator DMs = DMsPerBlock.begin(); DMs != DMsPerBlock.end(); DMs++ ) {
+				for ( vector< unsigned int >::iterator periods = periodsPerBlock.begin(); periods != periodsPerBlock.end(); periods++ ) {
+					if ( (*DMs * *periods) > maxThreadsPerBlock ) {
+						break;
 					}
-					Vcur[0] = sqrt(Vcur[0] / nrIterations);
-					Vcur[1] = sqrt(Vcur[1] / nrIterations);
+					double Acur[2] = {0.0, 0.0};
+					double Aold[2] = {0.0, 0.0};
+					double Vcur[2] = {0.0, 0.0};
+					double Vold[2] = {0.0, 0.0};
 
-					cout << nrDMs << " " << nrPeriods << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
-				} catch ( OpenCLError err ) {
-					cerr << err.what() << endl;
-					continue;
+					try {
+						// Generate kernel
+						SNR< dataType > clSNR("clSNRp" + toStringValue< unsigned int >(*periods), typeName);
+						clSNR.bindOpenCL(clContext, &(clDevices->at(clDeviceID)), &((clQueues->at(clDeviceID)).at(0)));
+						clSNR.setObservation(&observation);
+						clSNR.setNrDMsPerBlock(*DMs);
+						clSNR.setNrPeriodsPerBlock(*periods);
+						clSNR.setPulsarPipeline();
+						clSNR.generateCode();
+
+						// Warming up
+						clSNR(foldedData, SNRData);
+						(clSNR.getTimer()).reset();
+
+						// Measurements
+						for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
+							clSNR(foldedData, SNRData);
+							
+							if ( iteration == 0 ) {
+								Acur[0] = clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime();
+								Acur[1] = clSNR.getGB() / clSNR.getTimer().getLastRunTime();
+							} else {
+								Aold[0] = Acur[0];
+								Vold[0] = Vcur[0];
+
+								Acur[0] = Aold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) / (iteration + 1));
+								Vcur[0] = Vold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) * ((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Acur[0]));
+
+								Aold[1] = Acur[1];
+								Vold[1] = Vcur[1];
+
+								Acur[1] = Aold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) / (iteration + 1));
+								Vcur[1] = Vold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) * ((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Acur[1]));
+							}
+						}
+						Vcur[0] = sqrt(Vcur[0] / nrIterations);
+						Vcur[1] = sqrt(Vcur[1] / nrIterations);
+
+						cout << nrDMs << " " << nrPeriods << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
+					} catch ( OpenCLError err ) {
+						cerr << err.what() << endl;
+						continue;
+					}
 				}
-			}
 
-			cout << endl << endl;
+				cout << endl << endl;
+			}
 		}
 	}
 
