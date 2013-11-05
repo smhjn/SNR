@@ -49,7 +49,8 @@ public:
 	void generateCode() throw (OpenCLError);
 	void operator()(CLData< T > * input, CLData< T > * output) throw (OpenCLError);
 
-	inline void setNrPeriodsPerBlock(unsigned int periodsPerBlock);
+	inline void setNrDMsPerBlock(unsigned int DMs);
+	inline void setNrPeriodsPerBlock(unsigned int periods);
 	
 	inline void setTransientPipeline();
 	inline void setPulsarPipeline();
@@ -60,6 +61,7 @@ private:
 	cl::NDRange globalSize;
 	cl::NDRange localSize;
 
+	unsigned int nrDMsPerBlock;
 	unsigned int nrPeriodsPerBlock;
 
 	bool transientPipeline;
@@ -70,7 +72,7 @@ private:
 
 
 // Implementation
-template< typename T > SNR< T >::SNR(string name, string dataType) : Kernel< T >(name, dataType), globalSize(cl::NDRange(1, 1, 1)), localSize(cl::NDRange(1, 1, 1)), nrPeriodsPerBlock(0), transientPipeline(false), pulsarPipeline(false), observation(0) {}
+template< typename T > SNR< T >::SNR(string name, string dataType) : Kernel< T >(name, dataType), globalSize(cl::NDRange(1, 1, 1)), localSize(cl::NDRange(1, 1, 1)), nrDMsPerBlock(0), nrPeriodsPerBlock(0), transientPipeline(false), pulsarPipeline(false), observation(0) {}
 
 template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
 	delete this->code;
@@ -78,38 +80,39 @@ template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
 
 	if ( transientPipeline ) {
 		throw OpenCLError("Transient pipeline not implemented.");
-	}
-	else if ( pulsarPipeline ) {
+	} else if ( pulsarPipeline ) {
 		// Begin kernel's template
+		string nrDMsPerBlock_s = toStringValue< unsigned int >(nrDMsPerBlock);
 		string nrPeriodsPerBlock_s = toStringValue< unsigned int >(nrPeriodsPerBlock);
 		string nrBins_s = toStringValue< unsigned int >(observation->getNrBins());
-		string nrPaddedPeriods_s = toStringValue< unsigned int >(observation->getNrPaddedPeriods());
+		string nrPeriods_s = toStringValue< unsigned int >(observation->getNrPeriods());
+		string nrPaddedDMs_s = toStringValue< unsigned int >(observation->getNrPaddedDMs());
 		string nrBinsInverse_s = toStringValue< float >(1.0f / observation->getNrBins());
 
 		*(this->code) = "__kernel void " + this->name + "(__global const " + this->dataType + " * const restrict foldedData, __global " + this->dataType + " * const restrict snrs) {\n"
-			"const unsigned int dm = get_group_id(1);\n"
-			"const unsigned int period = ( get_group_id(0) * " + nrPeriodsPerBlock_s + " ) + get_local_id(0);\n"
-			"float average = 0;\n"
-			"float rms = 0;\n"
+			"const unsigned int dm = (get_group_id(0) * " + nrDMsPerBlock_s + ") + get_local_id(0);\n"
+			"const unsigned int period = ( get_group_id(1) * " + nrPeriodsPerBlock_s + " ) + get_local_id(1);\n"
+			+ this->dataType + " average = 0;\n"
+			+ this->dataType + " rms = 0;\n"
 			+ this->dataType + " max = 0;\n"
 			"\n"
 			"for ( unsigned int bin = 0; bin < " + nrBins_s + "; bin++ ) {\n"
-			"const " + this->dataType + " globalItem = foldedData[( ( ( dm * " + nrBins_s + " ) + bin ) * " + nrPaddedPeriods_s + " ) + period];\n"
+			"const " + this->dataType + " globalItem = foldedData[(bin * " + nrPeriods_s + " * " + nrPaddedDMs_s + ") + (period * " + nrPaddedDMs_s + ") + dm];\n"
 			"average += globalItem;\n"
 			"rms += ( globalItem * globalItem );\n"
 			"max = fmax(max, globalItem);\n"
 			"}\n"
-			"average *= " + nrBinsInverse_s + ";\n"
-			"rms *= " + nrBinsInverse_s + ";\n"
-			"snrs[( dm * " + nrPaddedPeriods_s + ") + period] = ( max - average ) / native_sqrt(rms);\n"
+			"average *= " + nrBinsInverse_s + "f;\n"
+			"rms *= " + nrBinsInverse_s + "f;\n"
+			"snrs[( period * " + nrPaddedDMs_s + ") + dm] = ( max - average ) / native_sqrt(rms);\n"
 			"}\n";
 		// End kernel's template
 
-		globalSize = cl::NDRange(observation->getNrPeriods(), observation->getNrDMs());
-		localSize = cl::NDRange(nrPeriodsPerBlock, 1);
+		globalSize = cl::NDRange(observation->getNrDMs(), observation->getNrPeriods());
+		localSize = cl::NDRange(nrDMsPerBlock, nrPeriodsPerBlock);
 
-		this->gflop = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ( ( observation->getNrBins() * 3 ) + 4 ));
-		this->gb = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ( ( observation->getNrBins() * sizeof(T) ) + sizeof(T) ));
+		this->gflop = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ((observation->getNrBins() * 3) + 4));
+		this->gb = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ((observation->getNrBins() * sizeof(T)) + sizeof(T)));
 	} else {
 		throw OpenCLError("Pipeline not implemented.");
 	}
@@ -124,8 +127,12 @@ template< typename T > void SNR< T >::operator()(CLData< T > * input, CLData< T 
 	this->run(globalSize, localSize);
 }
 
-template< typename T > inline void SNR< T >::setNrPeriodsPerBlock(unsigned int periodsPerBlock) {
-	nrPeriodsPerBlock = periodsPerBlock;
+template< typename T > inline void SNR< T >::setNrDMsPerBlock(unsigned int DMs) {
+	nrDMsPerBlock = DMs;
+}
+
+template< typename T > inline void SNR< T >::setNrPeriodsPerBlock(unsigned int periods) {
+	nrPeriodsPerBlock = periods;
 }
 
 template< typename T > inline void SNR< T >::setTransientPipeline() {
