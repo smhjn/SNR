@@ -158,7 +158,7 @@ int main(int argc, char * argv[]) {
 
 					try {
 						// Generate kernel
-						SNR< dataType > clSNR("clSNRp" + toStringValue< unsigned int >(*periods), typeName);
+						SNR< dataType > clSNR("clSNR", typeName);
 						clSNR.bindOpenCL(clContext, &(clDevices->at(clDeviceID)), &((clQueues->at(clDeviceID)).at(0)));
 						clSNR.setObservation(&observation);
 						clSNR.setNrDMsPerBlock(*DMs);
