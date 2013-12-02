@@ -126,6 +126,7 @@ int main(int argc, char * argv[]) {
 
 			try {
 				foldedData->allocateDeviceData();
+				foldedData->copyHostToDevice();
 				SNRData->allocateDeviceData();
 			} catch ( OpenCLError err ) {
 				cerr << err.what() << endl;
