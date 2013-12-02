@@ -54,24 +54,11 @@ using PulsarSearch::SNR;
 typedef float dataType;
 const string typeName("float");
 const unsigned int maxThreadsPerBlock = 1024;
-const unsigned int maxThreadMultiplier = 512;
+const unsigned int maxThreadMultiplier = 32;
 const unsigned int padding = 32;
 
-// Common parameters
-const unsigned int nrBeams = 1;
-const unsigned int nrStations = 64;
-// LOFAR
-/*const float minFreq = 138.965f;
-const float channelBandwidth = 0.195f;
-const unsigned int nrSamplesPerSecond = 200000;
-const unsigned int nrChannels = 32;*/
-// Apertif
-const float minFreq = 1425.0f;
-const float channelBandwidth = 0.2929f;
-const unsigned int nrSamplesPerSecond = 20000;
-const unsigned int nrChannels = 1024;
 // Periods
-const unsigned int nrBins = 256;
+const unsigned int nrBins = 128;
 
 
 int main(int argc, char * argv[]) {
@@ -106,9 +93,9 @@ int main(int argc, char * argv[]) {
 	initializeOpenCL(clPlatformID, 1, clPlatforms, clContext, clDevices, clQueues);
 	
 	cout << fixed << endl;
-	cout << "# nrDMs nrPeriods nrDMsPerBlock nrPeriodsPerBlock GFLOP/s err time err GB/s err " << endl << endl;
+	cout << "# nrDMs nrPeriods nrBins nrDMsPerBlock nrPeriodsPerBlock GFLOP/s err time err GB/s err " << endl << endl;
 	
-	for ( unsigned int nrDMs = 2; nrDMs <= 4096; nrDMs *= 2 )	{
+	for ( unsigned int nrDMs = 32; nrDMs <= 4096; nrDMs *= 2 )	{
 		observation.setNrDMs(nrDMs);
 		
 		for ( unsigned int nrPeriods = 2; nrPeriods <= 1024; nrPeriods *= 2 ) {
@@ -195,16 +182,15 @@ int main(int argc, char * argv[]) {
 						Vcur[0] = sqrt(Vcur[0] / nrIterations);
 						Vcur[1] = sqrt(Vcur[1] / nrIterations);
 
-						cout << nrDMs << " " << nrPeriods << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
+						cout << nrDMs << " " << nrPeriods << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
 					} catch ( OpenCLError err ) {
 						cerr << err.what() << endl;
 						continue;
 					}
 				}
-
-				cout << endl << endl;
 			}
 		}
+		cout << endl << endl;
 	}
 
 	cout << endl;
