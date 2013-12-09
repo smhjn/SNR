@@ -108,7 +108,7 @@ template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
 			"}\n";
 		// End kernel's template
 
-		globalSize = cl::NDRange(observation->getNrDMs(), observation->getNrPeriods());
+		globalSize = cl::NDRange(observation->getNrPaddedDMs(), observation->getNrPeriods());
 		localSize = cl::NDRange(nrDMsPerBlock, nrPeriodsPerBlock);
 
 		this->gflop = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ((observation->getNrBins() * 3) + 4));
