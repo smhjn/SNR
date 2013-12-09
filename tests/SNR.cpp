@@ -128,7 +128,7 @@ int main(int argc, char *argv[]) {
 	foldedData.copyHostToDevice();
 	clSNR(&foldedData, &SNRData);
 	SNRData.copyDeviceToHost();
-	pulsarSNR(observation, foldedData.getDeviceData(), SNRDataCPU.getDeviceData());
+	pulsarSNR(observation, foldedData.getHostData(), SNRDataCPU.getHostData());
 	for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
 		for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
 			if ( !same(SNRDataCPU[(period * observation.getNrPaddedDMs()) + dm], SNRData[(period * observation.getNrPaddedDMs()) + dm]) ) {
