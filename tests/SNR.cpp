@@ -116,6 +116,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	// Generate kernel
+	SNR< dataType > clSNR("clSNR", typeName);
 	clSNR.bindOpenCL(clContext, &(clDevices->at(clDeviceID)), &((clQueues->at(clDeviceID)).at(0)));
 	clSNR.setObservation(&observation);
 	clSNR.setNrDMsPerBlock(nrDMsPerBlock);
