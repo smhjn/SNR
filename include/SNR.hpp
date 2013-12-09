@@ -1,40 +1,36 @@
-/*
- * Copyright (C) 2012
- * Alessio Sclocco <a.sclocco@vu.nl>
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- *
- */
+//
+// Copyright (C) 2012
+// Alessio Sclocco <a.sclocco@vu.nl>
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU General Public License for more details.
+//
+// You should have received a copy of the GNU General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
 
-#define __CL_set_EXCEPTIONS
-#include <CL/cl.hpp>
 #include <string>
-#include <cmath>
 using std::string;
-using std::sqrt;
 
 #include <Exceptions.hpp>
-#include <CLData.hpp>
-#include <utils.hpp>
-#include <Kernel.hpp>
-#include <Observation.hpp>
 using isa::Exceptions::OpenCLError;
+#include <CLData.hpp>
 using isa::OpenCL::CLData;
+#include <utils.hpp>
 using isa::utils::toStringValue;
 using isa::utils::giga;
+#include <Kernel.hpp>
 using isa::OpenCL::Kernel;
+#include <Observation.hpp>
 using AstroData::Observation;
+
 
 #ifndef SNR_HPP
 #define SNR_HPP
@@ -91,7 +87,7 @@ template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
 
 		*(this->code) = "__kernel void " + this->name + "(__global const " + this->dataType + " * const restrict foldedData, __global " + this->dataType + " * const restrict snrs) {\n"
 			"const unsigned int dm = (get_group_id(0) * " + nrDMsPerBlock_s + ") + get_local_id(0);\n"
-			"const unsigned int period = ( get_group_id(1) * " + nrPeriodsPerBlock_s + " ) + get_local_id(1);\n"
+			"const unsigned int period = (get_group_id(1) * " + nrPeriodsPerBlock_s + ") + get_local_id(1);\n"
 			+ this->dataType + " average = 0;\n"
 			+ this->dataType + " rms = 0;\n"
 			+ this->dataType + " max = 0;\n"
@@ -99,12 +95,12 @@ template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
 			"for ( unsigned int bin = 0; bin < " + nrBins_s + "; bin++ ) {\n"
 			"const " + this->dataType + " globalItem = foldedData[(bin * " + nrPeriods_s + " * " + nrPaddedDMs_s + ") + (period * " + nrPaddedDMs_s + ") + dm];\n"
 			"average += globalItem;\n"
-			"rms += ( globalItem * globalItem );\n"
+			"rms += (globalItem * globalItem);\n"
 			"max = fmax(max, globalItem);\n"
 			"}\n"
 			"average *= " + nrBinsInverse_s + "f;\n"
 			"rms *= " + nrBinsInverse_s + "f;\n"
-			"snrs[( period * " + nrPaddedDMs_s + ") + dm] = ( max - average ) / native_sqrt(rms);\n"
+			"snrs[(period * " + nrPaddedDMs_s + ") + dm] = (max - average) / native_sqrt(rms);\n"
 			"}\n";
 		// End kernel's template
 
