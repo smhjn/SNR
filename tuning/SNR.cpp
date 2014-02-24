@@ -176,7 +176,7 @@ int main(int argc, char * argv[]) {
 				Vcur[0] = sqrt(Vcur[0] / nrIterations);
 				Vcur[1] = sqrt(Vcur[1] / nrIterations);
 
-				cout << nrDMs << " " << nrPeriods << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
+				cout << observation.getNrDMs() << " " << observation.getNrPeriods() << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
 			} catch ( OpenCLError err ) {
 				cerr << err.what() << endl;
 				continue;
