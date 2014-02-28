@@ -133,11 +133,6 @@ int main(int argc, char * argv[]) {
 			if ( (*DMs * *periods) > maxThreadsPerBlock ) {
 				break;
 			}
-			double Acur[2] = {0.0, 0.0};
-			double Aold[2] = {0.0, 0.0};
-			double Vcur[2] = {0.0, 0.0};
-			double Vold[2] = {0.0, 0.0};
-
 			try {
 				// Generate kernel
 				SNR< dataType > clSNR("clSNR", typeName);
@@ -155,28 +150,9 @@ int main(int argc, char * argv[]) {
 				// Measurements
 				for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
 					clSNR(foldedData, SNRData);
-					
-					if ( iteration == 0 ) {
-						Acur[0] = clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime();
-						Acur[1] = clSNR.getGB() / clSNR.getTimer().getLastRunTime();
-					} else {
-						Aold[0] = Acur[0];
-						Vold[0] = Vcur[0];
-
-						Acur[0] = Aold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) / (iteration + 1));
-						Vcur[0] = Vold[0] + (((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Aold[0]) * ((clSNR.getGFLOP() / clSNR.getTimer().getLastRunTime()) - Acur[0]));
-
-						Aold[1] = Acur[1];
-						Vold[1] = Vcur[1];
-
-						Acur[1] = Aold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) / (iteration + 1));
-						Vcur[1] = Vold[1] + (((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Aold[1]) * ((clSNR.getGB() / clSNR.getTimer().getLastRunTime()) - Acur[1]));
-					}
 				}
-				Vcur[0] = sqrt(Vcur[0] / nrIterations);
-				Vcur[1] = sqrt(Vcur[1] / nrIterations);
 
-				cout << observation.getNrDMs() << " " << observation.getNrPeriods() << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << Acur[0] << " " << Vcur[0] << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << Acur[1] << " " << Vcur[1] << endl;
+				cout << observation.getNrDMs() << " " << observation.getNrPeriods() << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << clSNR.getGFLOPs() << " " << clSNR.getGFLOPsErr() << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << clSNR.getGBs() << " " << clSNR.getGBsErr() << endl;
 			} catch ( OpenCLError err ) {
 				cerr << err.what() << endl;
 				continue;
