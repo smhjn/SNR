@@ -146,6 +146,7 @@ int main(int argc, char * argv[]) {
 				// Warming up
 				clSNR(foldedData, SNRData);
 				(clSNR.getTimer()).reset();
+				clSNR.resetStats();
 
 				// Measurements
 				for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
