@@ -82,7 +82,7 @@ int main(int argc, char * argv[]) {
         observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
         observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
     } catch ( EmptyCommandLine err ) {
-        cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_rows ... -dms ... -periods ... -bins ..." << endl;
+        cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_columns ... -max_rows ... -dms ... -periods ... -bins ..." << endl;
         return 1;
     } catch ( exception & err ) {
         cerr << err.what() << endl;
