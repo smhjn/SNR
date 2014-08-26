@@ -1,4 +1,4 @@
-// Copyright 2012 Alessio Sclocco <a.sclocco@vu.nl>
+// Copyright 2014 Alessio Sclocco <a.sclocco@vu.nl>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,19 +13,9 @@
 // limitations under the License.
 
 #include <string>
-using std::string;
 
-#include <Exceptions.hpp>
-using isa::Exceptions::OpenCLError;
-#include <CLData.hpp>
-using isa::OpenCL::CLData;
 #include <utils.hpp>
-using isa::utils::toStringValue;
-using isa::utils::giga;
-#include <Kernel.hpp>
-using isa::OpenCL::Kernel;
 #include <Observation.hpp>
-using AstroData::Observation;
 
 
 #ifndef SNR_HPP
@@ -33,114 +23,109 @@ using AstroData::Observation;
 
 namespace PulsarSearch {
 
+// Sequential SNR
+template< typename T > void snrFoldedTS(const AstroData::Observation< T > & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
-template< typename T > class SNR : public Kernel< T > {
-public:
-	SNR(string name, string dataType);
-
-	void generateCode() throw (OpenCLError);
-	void operator()(CLData< T > * input, CLData< T > * output) throw (OpenCLError);
-
-	inline void setNrDMsPerBlock(unsigned int DMs);
-	inline void setNrPeriodsPerBlock(unsigned int periods);
-
-	inline void setTransientPipeline();
-	inline void setPulsarPipeline();
-
-	inline void setObservation(Observation< T > * obs);
-
-private:
-	cl::NDRange globalSize;
-	cl::NDRange localSize;
-
-	unsigned int nrDMsPerBlock;
-	unsigned int nrPeriodsPerBlock;
-
-	bool transientPipeline;
-	bool pulsarPipeline;
-
-	Observation< T > * observation;
-};
+template< typename T > std::string getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation< T > & observation);
 
 
-// Implementation
-template< typename T > SNR< T >::SNR(string name, string dataType) : Kernel< T >(name, dataType), globalSize(cl::NDRange(1, 1, 1)), localSize(cl::NDRange(1, 1, 1)), nrDMsPerBlock(0), nrPeriodsPerBlock(0), transientPipeline(false), pulsarPipeline(false), observation(0) {}
+// Implementations
+template< typename T > void snrFoldedTS(AstroData::Observation< T > & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs) {
+	for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+		for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+			T max = 0;
+			float average = 0.0f;
+			float rms = 0.0f;
 
-template< typename T > void SNR< T >::generateCode() throw (OpenCLError) {
-	delete this->code;
-	this->code = new string();
+			for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
+				T value = foldedTS[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + dm];
 
-	if ( transientPipeline ) {
-		throw OpenCLError("Transient pipeline not implemented.");
-	} else if ( pulsarPipeline ) {
-		// Begin kernel's template
-		string nrDMsPerBlock_s = toStringValue< unsigned int >(nrDMsPerBlock);
-		string nrPeriodsPerBlock_s = toStringValue< unsigned int >(nrPeriodsPerBlock);
-		string nrBins_s = toStringValue< unsigned int >(observation->getNrBins());
-		string nrPeriods_s = toStringValue< unsigned int >(observation->getNrPeriods());
-		string nrPaddedDMs_s = toStringValue< unsigned int >(observation->getNrPaddedDMs());
-		string nrBinsInverse_s = toStringValue< float >(1.0f / observation->getNrBins());
+				average += value;
+				rms += (value * value);
 
-		*(this->code) = "__kernel void " + this->name + "(__global const " + this->dataType + " * const restrict foldedData, __global " + this->dataType + " * const restrict snrs) {\n"
-			"const unsigned int dm = (get_group_id(0) * " + nrDMsPerBlock_s + ") + get_local_id(0);\n"
-			"const unsigned int period = (get_group_id(1) * " + nrPeriodsPerBlock_s + ") + get_local_id(1);\n"
-			+ this->dataType + " average = 0;\n"
-			+ this->dataType + " rms = 0;\n"
-			+ this->dataType + " max = 0;\n"
-			"\n"
-			"for ( unsigned int bin = 0; bin < " + nrBins_s + "; bin++ ) {\n"
-			"const " + this->dataType + " globalItem = foldedData[(bin * " + nrPeriods_s + " * " + nrPaddedDMs_s + ") + (period * " + nrPaddedDMs_s + ") + dm];\n"
-			"average += globalItem;\n"
-			"rms += (globalItem * globalItem);\n"
-			"max = fmax(max, globalItem);\n"
-			"}\n"
-			"average *= " + nrBinsInverse_s + "f;\n"
-			"rms *= " + nrBinsInverse_s + "f;\n"
-			"snrs[(period * " + nrPaddedDMs_s + ") + dm] = (max - average) / native_sqrt(rms);\n"
-			"}\n";
-		// End kernel's template
+				if ( value > max ) {
+					max = value;
+				}
+			}
+			average /= observation.getNrBins();
+			rms = sqrt(rms / observation.getNrBins());
 
-		globalSize = cl::NDRange(observation->getNrPaddedDMs(), observation->getNrPeriods());
-		localSize = cl::NDRange(nrDMsPerBlock, nrPeriodsPerBlock);
-
-		this->gflop = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ((observation->getNrBins() * 3) + 4));
-		this->gb = giga(static_cast< long long unsigned int >(observation->getNrDMs()) * observation->getNrPeriods() * ((observation->getNrBins() * sizeof(T)) + sizeof(T)));
-	} else {
-		throw OpenCLError("Pipeline not implemented.");
+			snrs[(period * observation.getNrPaddedDMs()) + dm] = (max - average) / rms;
+		}
 	}
-
-	this->compile();
 }
 
-template< typename T > void SNR< T >::operator()(CLData< T > * input, CLData< T > * output) throw (OpenCLError) {
-	this->setArgument(0, *(input->getDeviceData()));
-	this->setArgument(1, *(output->getDeviceData()));
+template< typename T > std::string getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation< T > & observation) {
+  std::string * code = new std::string();
 
-	this->run(globalSize, localSize);
-}
+  // Begin kernel's template
+  std::string nrPaddedDMs_s = isa::utils::toString< unsigned int >(observation.getNrPaddedDMs());
+  std::string nrBinsInverse_s = isa::utils::toString< float >(1.0f / observation.getNrBins());
 
-template< typename T > inline void SNR< T >::setNrDMsPerBlock(unsigned int DMs) {
-	nrDMsPerBlock = DMs;
-}
+  *code = "__kernel void snr(__global const " + dataType + " * const restrict foldedData, __global " + dataType + " * const restrict snrs) {\n"
+    "<%DEF_DM%>"
+    "<%DEF_PERIOD%>"
+    + dataType + " globalItem = 0;\n"
+    + dataType + " average = 0;\n"
+    + dataType + " rms = 0;\n"
+    + dataType + " max = 0;\n"
+    "\n"
+    "<%COMPUTE%>";
+    std::string defDMsTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%DM_NUM%>;\n";
+  std::string defPeriodsTemplate = "const unsigned int period<%PERIOD_NUM%> = (get_group_id(1) * " + isa::utils::toString< unsigned int >(nrPeriodsPerBlock * nrPeriodsPerThread) + ") + get_local_id(1) + <%PERIOD_NUM%>;\n";
+  std::string computeTemplate = "average = 0;\n"
+    " rms = 0;\n"
+    " max = 0;\n"
+    "for ( unsigned int bin = 0; bin < " + isa::utils::toString< unsigned int >(observation.getNrBins()) + "; bin++ ) {\n"
+    "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + ((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>];\n"
+    "average += globalItem;\n"
+    "rms += (globalItem * globalItem);\n"
+    "max = fmax(max, globalItem);\n"
+    "}\n"
+    "average *= " + nrBinsInverse_s + "f;\n"
+    "rms *= " + nrBinsInverse_s + "f;\n"
+    "snrs[((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>] = (max - average) / native_sqrt(rms);\n"
+    "}\n";
+  // End kernel's template
 
-template< typename T > inline void SNR< T >::setNrPeriodsPerBlock(unsigned int periods) {
-	nrPeriodsPerBlock = periods;
-}
+  std::string * defDM_s = new std::string();
+  std::string * defPeriod_s = new std::string();
+  std::string * compute_s = new std::string();
 
-template< typename T > inline void SNR< T >::setTransientPipeline() {
-	transientPipeline = true;
-	pulsarPipeline = false;
-}
+  for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
+    std::string dm_s = isa::utils::toString< unsigned int >(dm);
+    std::string * temp_s = 0;
 
-template< typename T > inline void SNR< T >::setPulsarPipeline() {
-	pulsarPipeline = true;
-	transientPipeline = false;
-}
+    temp_s = isa::utils::replace(&defDMsTemplate, "<%DM_NUM%>", dm_s);
+    defDM_s->append(*temp_s);
+    delete temp_s;
+  }
+  for ( unsigned int period = 0; period < nrPeriodsPerThread; period++ ) {
+    std::string period_s = isa::utils::toString< unsigned int >(period);
+    std::string * temp_s = 0;
 
-template< typename T >inline void SNR< T >::setObservation(Observation< T > *obs) {
-	observation = obs;
+    temp_s = isa::utils::replace(&defPeriodsTemplate, "<%PERIOD_NUM%>", period_s);
+    defPeriod_s->append(*temp_s);
+    delete temp_s;
+
+    for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
+      std::string dm_s = isa::utils::toString< unsigned int >(dm);
+
+      temp_s = isa::utils::replace(&computeTemplate, "<%PERIOD_NUM%>", period_s);
+      temp_s = isa::utils::replace(temp_s, "<%DM_NUM%>", dm_s, true);
+      compute_s->append(*temp_s);
+      delete temp_s;
+    }
+  }
+
+  code = isa::utils::replace(code, "<%DEF_DM%>", *defDM_s, true);
+  code = isa::utils::replace(code, "<%DEF_PERIOD%>", *defPeriod_s, true);
+  code = isa::utils::replace(code, "<%COMPUTE%>", *compute_s, true);
+
+  return code;
 }
 
 } // PulsarSearch
 
 #endif // SNR_HPP
+
