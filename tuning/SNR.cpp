@@ -25,8 +25,7 @@
 #include <Observation.hpp>
 #include <InitializeOpenCL.hpp>
 #include <Kernel.hpp>
-#include <Bins.hpp>
-#include <Folding.hpp>
+#include <SNR.hpp>
 #include <utils.hpp>
 #include <Exceptions.hpp>
 #include <Timer.hpp>
