@@ -1,4 +1,4 @@
-// Copyright 2013 Alessio Sclocco <a.sclocco@vu.nl>
+// Copyright 2014 Alessio Sclocco <a.sclocco@vu.nl>
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,153 +13,187 @@
 // limitations under the License.
 
 #include <iostream>
-using std::cout;
-using std::cerr;
-using std::endl;
-using std::fixed;
 #include <string>
-using std::string;
 #include <vector>
-using std::vector;
 #include <exception>
-using std::exception;
 #include <fstream>
-using std::ofstream;
 #include <iomanip>
-using std::setprecision;
 #include <limits>
-using std::numeric_limits;
-#include <cmath>
+#include <algorithm>
 
 #include <ArgumentList.hpp>
-using isa::utils::ArgumentList;
 #include <Observation.hpp>
-using AstroData::Observation;
 #include <InitializeOpenCL.hpp>
-using isa::OpenCL::initializeOpenCL;
-#include <CLData.hpp>
-using isa::OpenCL::CLData;
+#include <Kernel.hpp>
+#include <Bins.hpp>
+#include <Folding.hpp>
 #include <utils.hpp>
-using isa::utils::toStringValue;
-#include <SNR.hpp>
-using PulsarSearch::SNR;
+#include <Exceptions.hpp>
 #include <Timer.hpp>
-using isa::utils::Timer;
+#include <Stats.hpp>
 
 typedef float dataType;
-const string typeName("float");
+string typeName("float");
 
 
 int main(int argc, char * argv[]) {
-    unsigned int nrIterations = 0;
-    unsigned int clPlatformID = 0;
-    unsigned int clDeviceID = 0;
-    unsigned int minThreads = 0;
-    unsigned int maxThreadsPerBlock = 0;
-    unsigned int maxColumns = 0;
-    unsigned int maxRows = 0;
-    Observation< dataType > observation("SNRTuning", typeName);
-    CLData< dataType > * foldedData = new CLData< dataType >("FoldedData", true);
-    CLData< dataType > * SNRData = new CLData< dataType >("SNRData", true);
+	unsigned int nrIterations = 0;
+	unsigned int clPlatformID = 0;
+	unsigned int clDeviceID = 0;
+	unsigned int minThreads = 0;
+	unsigned int maxThreadsPerBlock = 0;
+	unsigned int maxItemsPerThread = 0;
+	unsigned int maxColumns = 0;
+	unsigned int maxRows = 0;
+  AstroData::Observation< dataType > observation("SNRTuning", typeName);
 
+	try {
+    isa::utils::ArgumentList args(argc, argv);
 
-    try {
-        ArgumentList args(argc, argv);
+		nrIterations = args.getSwitchArgument< unsigned int >("-iterations");
+		clPlatformID = args.getSwitchArgument< unsigned int >("-opencl_platform");
+		clDeviceID = args.getSwitchArgument< unsigned int >("-opencl_device");
+		observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
+		minThreads = args.getSwitchArgument< unsigned int >("-min_threads");
+		maxThreadsPerBlock = args.getSwitchArgument< unsigned int >("-max_threads");
+		maxItemsPerThread = args.getSwitchArgument< unsigned int >("-max_items");
+		maxColumns = args.getSwitchArgument< unsigned int >("-max_columns");
+		maxRows = args.getSwitchArgument< unsigned int >("-max_rows");
+		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
+    observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
+    observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
+	} catch ( isa::Exceptions::EmptyCommandLine &err ) {
+		std::cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_items ... -max_columns ... -max_rows ... -dms ... -periods ... -bins ... " << std::endl;
+		return 1;
+	} catch ( std::exception &err ) {
+		std::cerr << err.what() << std::endl;
+		return 1;
+	}
 
-        clPlatformID = args.getSwitchArgument< unsigned int >("-opencl_platform");
-        clDeviceID = args.getSwitchArgument< unsigned int >("-opencl_device");
-        nrIterations = args.getSwitchArgument< unsigned int >("-iterations");
-        observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
-        minThreads = args.getSwitchArgument< unsigned int >("-min_threads");
-        maxThreadsPerBlock = args.getSwitchArgument< unsigned int >("-max_threads");
-        maxColumns = args.getSwitchArgument< unsigned int >("-max_columns");
-        maxRows = args.getSwitchArgument< unsigned int >("-max_rows");
-        observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
-        observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
-        observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
-    } catch ( EmptyCommandLine err ) {
-        cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_columns ... -max_rows ... -dms ... -periods ... -bins ..." << endl;
-        return 1;
-    } catch ( exception & err ) {
-        cerr << err.what() << endl;
-        return 1;
+	// Initialize OpenCL
+	cl::Context * clContext = new cl::Context();
+	std::vector< cl::Platform > * clPlatforms = new std::vector< cl::Platform >();
+	std::vector< cl::Device > * clDevices = new std::vector< cl::Device >();
+	std::vector< std::vector< cl::CommandQueue > > * clQueues = new std::vector< std::vector < cl::CommandQueue > >();
+
+  isa::OpenCL::initializeOpenCL(clPlatformID, 1, clPlatforms, clContext, clDevices, clQueues);
+
+	// Allocate memory
+  std::vector< dataType > foldedData = std::vector< dataType >(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedDMs());
+  cl::Buffer foldedData_d;
+  std::vector< dataType > snrs = std::vector< dataType >(observation.getNrPeriods() * observation.getNrPaddedDMs());
+  cl::Buffer snrs_d;
+  try {
+    foldedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, foldedData.size() * sizeof(dataType), NULL, NULL);
+    snrs_d = cl::Buffer(*clContext, CL_MEM_WRITE_ONLY, snrs.size() * sizeof(dataType), NULL, NULL);
+  } catch ( cl::Error &err ) {
+    std::cerr << "OpenCL error allocating memory: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+    return 1;
+  }
+
+	srand(time(NULL));
+  for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
+    for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+      for ( unsigned int DM = 0; DM < observation.getNrDMs(); DM++ ) {
+        foldedData[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + DM] = static_cast< dataType >(rand() % 10);
+      }
     }
+	}
+  std::fill(snrs.begin(), snrs.end(), static_cast< dataType >(0));
 
-    cl::Context * clContext = new cl::Context();
-    vector< cl::Platform > * clPlatforms = new vector< cl::Platform >();
-    vector< cl::Device > * clDevices = new vector< cl::Device >();
-    vector< vector< cl::CommandQueue > > * clQueues = new vector< vector < cl::CommandQueue > >();
+  // Copy data structures to device
+  try {
+    clQueues->at(clDeviceID)[0].enqueueWriteBuffer(foldedData_d, CL_FALSE, 0, foldedData.size() * sizeof(dataType), reinterpret_cast< void * >(foldedData.data()));
+    clQueues->at(clDeviceID)[0].enqueueWriteBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
+  } catch ( cl::Error &err ) {
+    std::cerr << "OpenCL error H2D transfer: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+    return 1;
+  }
 
-    initializeOpenCL(clPlatformID, 1, clPlatforms, clContext, clDevices, clQueues);
+	// Find the parameters
+	std::vector< unsigned int > DMsPerBlock;
+	for ( unsigned int DMs = minThreads; DMs <= maxColumns; DMs += minThreads ) {
+		if ( (observation.getNrPaddedDMs() % DMs) == 0 ) {
+			DMsPerBlock.push_back(DMs);
+		}
+	}
+	std::vector< unsigned int > periodsPerBlock;
+	for ( unsigned int periods = 1; periods <= maxRows; periods++ ) {
+		if ( (observation.getNrPeriods() % periods) == 0 ) {
+			periodsPerBlock.push_back(periods);
+		}
+	}
 
-    cout << fixed << endl;
-    cout << "# nrDMs nrPeriods nrBins nrDMsPerBlock nrPeriodsPerBlock GFLOP/s err time err GB/s err " << endl << endl;
+	std::cout << std::fixed << std::endl;
+	std::cout << "# nrDMs nrPeriods nrBins DMsPerBlock periodsPerBlock DMsPerThread periodsPerThread GFLOP/s err time err" << std::endl << std::endl;
 
-    // Allocate memory
-    foldedData->allocateHostData(observation.getNrPaddedDMs() * observation.getNrBins() * observation.getNrPeriods());
-    SNRData->allocateHostData(observation.getNrPaddedDMs() * observation.getNrPeriods());
-
-    foldedData->setCLContext(clContext);
-    foldedData->setCLQueue(&((clQueues->at(clDeviceID)).at(0)));
-    SNRData->setCLContext(clContext);
-    SNRData->setCLQueue(&((clQueues->at(clDeviceID)).at(0)));
-
-    try {
-        foldedData->allocateDeviceData();
-        foldedData->copyHostToDevice();
-        SNRData->allocateDeviceData();
-    } catch ( OpenCLError err ) {
-        cerr << err.what() << endl;
-    }
-
-    // Find the parameters
-    vector< unsigned int > DMsPerBlock;
-    for ( unsigned int DMs = minThreads; DMs <= maxColumns; DMs += minThreads ) {
-        if ( (observation.getNrPaddedDMs() % DMs) == 0 ) {
-            DMsPerBlock.push_back(DMs);
+  for ( std::vector< unsigned int >::iterator DMs = DMsPerBlock.begin(); DMs != DMsPerBlock.end(); ++DMs ) {
+    for ( std::vector< unsigned int >::iterator periods = periodsPerBlock.begin(); periods != periodsPerBlock.end(); ++periods ) {
+      if ( (*DMs * *periods) > maxThreadsPerBlock ) {
+        break;
+      }
+      for ( unsigned int DMsPerThread = 1; DMsPerThread <= maxItemsPerThread; DMsPerThread++ ) {
+        if ( observation.getNrPaddedDMs() % (*DMs * DMsPerThread) != 0 ) {
+          continue;
         }
-    }
-    vector< unsigned int > periodsPerBlock;
-    for ( unsigned int periods = 1; periods <= maxRows; periods++ ) {
-        if ( (observation.getNrPeriods() % periods) == 0 ) {
-            periodsPerBlock.push_back(periods);
-        }
-    }
+        for ( unsigned int periodsPerThread = 1; periodsPerThread <= maxItemsPerThread; periodsPerThread++ ) {
+          if ( observation.getNrPeriods() % (*periods * periodsPerThread) != 0 ) {
+            continue;
+          }
+          if ( DMsPerThread + periodsPerThread > maxItemsPerThread ) {
+            break;
+          }
+          // Generate kernel
+          cl::Kernel * kernel;
+          std::string * code = PulsarSearch::getSNROpenCL(*DMs, *periods, DMsPerThread, periodsPerThread, typeName, observation);
 
-    for ( vector< unsigned int >::iterator DMs = DMsPerBlock.begin(); DMs != DMsPerBlock.end(); DMs++ ) {
-        for ( vector< unsigned int >::iterator periods = periodsPerBlock.begin(); periods != periodsPerBlock.end(); periods++ ) {
-            if ( (*DMs * *periods) > maxThreadsPerBlock ) {
-                break;
+          try {
+            kernel = isa::OpenCL::compile("snr", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
+          } catch ( isa::Exceptions::OpenCLError &err ) {
+            std::cerr << err.what() << std::endl;
+            continue;
+          }
+
+          cl::NDRange global(observation.getNrPaddedDMs() / DMsPerThread, observation.getNrPeriods() / periodsPerThread);
+          cl::NDRange local(*DMs, *periods);
+
+          kernel->setArg(0, foldedData_d);
+          kernel->setArg(1, snrs_d);
+
+          // Warm-up run
+          try {
+            clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local);
+          } catch ( cl::Error &err ) {
+            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+            continue;
+          }
+          // Tuning runs
+          double flops = isa::utils::giga(static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods() * observation.getNrBins());
+          isa::utils::Timer timer("Kernel Timer");
+          isa::utils::Stats< double > stats;
+          cl::Event event;
+
+          try {
+            for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
+              timer.start();
+              clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, &event);
+              event.wait();
+              timer.stop();
+              stats.addElement(flops / timer.getLastRunTime());
             }
-            try {
-                // Generate kernel
-                SNR< dataType > clSNR("clSNR", typeName);
-                clSNR.bindOpenCL(clContext, &(clDevices->at(clDeviceID)), &((clQueues->at(clDeviceID)).at(0)));
-                clSNR.setObservation(&observation);
-                clSNR.setNrDMsPerBlock(*DMs);
-                clSNR.setNrPeriodsPerBlock(*periods);
-                clSNR.setPulsarPipeline();
-                clSNR.generateCode();
+          } catch ( cl::Error &err ) {
+            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+            continue;
+          }
 
-                // Warming up
-                clSNR(foldedData, SNRData);
-                (clSNR.getTimer()).reset();
-                clSNR.resetStats();
-
-                // Measurements
-                for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
-                    clSNR(foldedData, SNRData);
-                }
-
-                cout << observation.getNrDMs() << " " << observation.getNrPeriods() << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << setprecision(3) << clSNR.getGFLOPs() << " " << clSNR.getGFLOPsErr() << " " << setprecision(6) << clSNR.getTimer().getAverageTime() << " " << clSNR.getTimer().getStdDev() << " " << setprecision(3) << clSNR.getGBs() << " " << clSNR.getGBsErr() << endl;
-            } catch ( OpenCLError err ) {
-                cerr << err.what() << endl;
-                continue;
-            }
+          std::cout << observation.getNrDMs() << " " << observation.getNrPeriods() << " " << observation.getNrBins() << " " << *DMs << " " << *periods << " " << DMsPerThread << " " << periodsPerThread << " " << std::setprecision(3) << stats.getAverage() << " " << stats.getStdDev() << " " << std::setprecision(6) << timer.getAverageTime() << " " << timer.getStdDev() << std::endl;
         }
+      }
     }
+  }
 
-    cout << endl;
+	std::cout << std::endl;
 
-    return 0;
+	return 0;
 }
+
