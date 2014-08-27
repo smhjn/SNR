@@ -123,14 +123,15 @@ int main(int argc, char *argv[]) {
 
   // Run OpenCL kernel and CPU control
   try {
-    cl::NDRange global(observation.getNrPaddedDMs() / DMsPerThread, observation.getNrPeriods() / periodsPerThread);
+    cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread, observation.getNrPeriods() / nrPeriodsPerThread);
     cl::NDRange local(nrDMsPerBlock, nrPeriodsPerBlock);
 
     kernel->setArg(0, foldedData_d);
     kernel->setArg(1, snrs_d);
     
-    clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, &event);
+    clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, NULL);
     PulsarSearch::snrFoldedTS(observation, foldedData, snrs_c);
+    clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()), NULL, NULL);
   } catch ( cl::Error &err ) {
     std::cerr << "OpenCL error: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
     return 1;
