@@ -165,7 +165,7 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
       "}\n"
       "average = _mm256_div_ps(average, _mm256_set1_ps(observation.getNrBins()));\n"
       "rms = _mm256_sqrt_ps(_mm256_div_ps(rms, _mm256_set1_ps(observation.getNrBins())));\n"
-      "_mm256_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>]),_mm256_div_ps(_mm256_sub_ps(max, average), rms));\n";
+      "_mm256_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]),_mm256_div_ps(_mm256_sub_ps(max, average), rms));\n";
   } else {
     *code = "namespace PulsarSearch {\n"
       "template< typename T > void snrPhi" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation< T > & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
@@ -196,7 +196,7 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
       "}\n"
       "average = _mm512_div_ps(average, _mm512_set1_ps(observation.getNrBins()));\n"
       "rms = _mm512_sqrt_ps(_mm512_div_ps(rms, _mm512_set1_ps(observation.getNrBins())));\n"
-      "_mm512_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>]),_mm512_div_ps(_mm512_sub_ps(max, average), rms));\n";
+      "_mm512_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]),_mm512_div_ps(_mm512_sub_ps(max, average), rms));\n";
   }
   // End kernel's template
 
