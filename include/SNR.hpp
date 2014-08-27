@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #include <string>
+#include <cmath>
 #include <x86intrin.h>
 
 #include <utils.hpp>
@@ -53,7 +54,7 @@ template< typename T > void snrFoldedTS(AstroData::Observation< T > & observatio
 				}
 			}
 			average /= observation.getNrBins();
-			rms = sqrt(rms / observation.getNrBins());
+			rms = std::sqrt(rms / observation.getNrBins());
 
 			snrs[(period * observation.getNrPaddedDMs()) + dm] = (max - average) / rms;
 		}
