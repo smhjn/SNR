@@ -24,6 +24,8 @@
 
 namespace PulsarSearch {
 
+template< typename T > using snrFunc = void (*)(const AstroData::Observation< T > &, const float *, float *);
+
 // Sequential SNR
 template< typename T > void snrFoldedTS(const AstroData::Observation< T > & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
