@@ -131,7 +131,7 @@ int main(int argc, char *argv[]) {
     
     clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, NULL);
     PulsarSearch::snrFoldedTS(observation, foldedData, snrs_c);
-    clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()), NULL, NULL);
+    clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_TRUE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
   } catch ( cl::Error &err ) {
     std::cerr << "OpenCL error: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
     return 1;
