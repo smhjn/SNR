@@ -84,14 +84,14 @@ template< typename T > std::string * getSNROpenCL(const unsigned int nrDMsPerBlo
     "rms = 0;\n"
     "max = 0;\n"
     "for ( unsigned int bin = 0; bin < " + isa::utils::toString< unsigned int >(observation.getNrBins()) + "; bin++ ) {\n"
-    "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + ((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>];\n"
+    "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + (period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>];\n"
     "average += globalItem;\n"
     "rms += (globalItem * globalItem);\n"
     "max = fmax(max, globalItem);\n"
     "}\n"
     "average *= " + nrBinsInverse_s + "f;\n"
     "rms *= " + nrBinsInverse_s + "f;\n"
-    "snrs[((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>] = (max - average) / native_sqrt(rms);\n";
+    "snrs[(period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>] = (max - average) / native_sqrt(rms);\n";
   // End kernel's template
 
   std::string * defDM_s = new std::string();
