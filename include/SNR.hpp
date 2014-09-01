@@ -81,8 +81,8 @@ template< typename T > std::string * getSNROpenCL(const unsigned int nrDMsPerBlo
     std::string defDMsTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%DM_NUM%>;\n";
   std::string defPeriodsTemplate = "const unsigned int period<%PERIOD_NUM%> = (get_group_id(1) * " + isa::utils::toString< unsigned int >(nrPeriodsPerBlock * nrPeriodsPerThread) + ") + get_local_id(1) + <%PERIOD_NUM%>;\n";
   std::string computeTemplate = "average = 0;\n"
-    " rms = 0;\n"
-    " max = 0;\n"
+    "rms = 0;\n"
+    "max = 0;\n"
     "for ( unsigned int bin = 0; bin < " + isa::utils::toString< unsigned int >(observation.getNrBins()) + "; bin++ ) {\n"
     "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + ((period + <%PERIOD_NUM%>) * " + nrPaddedDMs_s + ") + dm + <%DM_NUM%>];\n"
     "average += globalItem;\n"
