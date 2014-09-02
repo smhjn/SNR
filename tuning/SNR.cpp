@@ -27,7 +27,6 @@
 #include <Kernel.hpp>
 #include <SNR.hpp>
 #include <utils.hpp>
-#include <Exceptions.hpp>
 #include <Timer.hpp>
 #include <Stats.hpp>
 
@@ -61,7 +60,7 @@ int main(int argc, char * argv[]) {
 		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
     observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
     observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
-	} catch ( isa::Exceptions::EmptyCommandLine &err ) {
+	} catch ( isa::utils::EmptyCommandLine &err ) {
 		std::cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_items ... -max_columns ... -max_rows ... -dms ... -periods ... -bins ... " << std::endl;
 		return 1;
 	} catch ( std::exception &err ) {
@@ -148,7 +147,7 @@ int main(int argc, char * argv[]) {
 
           try {
             kernel = isa::OpenCL::compile("snr", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
-          } catch ( isa::Exceptions::OpenCLError &err ) {
+          } catch ( isa::OpenCL::OpenCLError &err ) {
             std::cerr << err.what() << std::endl;
             continue;
           }
