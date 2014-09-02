@@ -22,7 +22,6 @@
 #include <ctime>
 
 #include <ArgumentList.hpp>
-#include <Exceptions.hpp>
 #include <Observation.hpp>
 #include <InitializeOpenCL.hpp>
 #include <Kernel.hpp>
@@ -57,7 +56,7 @@ int main(int argc, char *argv[]) {
 		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
     observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
     observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
-	} catch  ( isa::Exceptions::SwitchNotFound &err ) {
+	} catch  ( isa::utils::SwitchNotFound &err ) {
     std::cerr << err.what() << std::endl;
     return 1;
   }catch ( std::exception &err ) {
@@ -116,7 +115,7 @@ int main(int argc, char *argv[]) {
 
   try {
     kernel = isa::OpenCL::compile("snr", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
-  } catch ( isa::Exceptions::OpenCLError &err ) {
+  } catch ( isa::OpenCL::OpenCLError &err ) {
     std::cerr << err.what() << std::endl;
     return 1;
   }
