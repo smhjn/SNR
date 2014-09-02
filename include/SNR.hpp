@@ -133,7 +133,7 @@ template< typename T > std::string * getSNROpenCL(const unsigned int nrDMsPerBlo
 
 std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi) {
   std::string * code = new std::string();
-  std::string * computeTemplate = new string();
+  std::string * computeTemplate = new std::string();
 
   // Begin kernel's template
   if ( !phi ) {
