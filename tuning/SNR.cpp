@@ -82,14 +82,14 @@ int main(int argc, char * argv[]) {
   std::vector< dataType > snrs = std::vector< dataType >(observation.getNrPeriods() * observation.getNrPaddedDMs());
   cl::Buffer snrs_d;
   try {
-    foldedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, foldedData.size() * sizeof(dataType), NULL, NULL);
-    snrs_d = cl::Buffer(*clContext, CL_MEM_WRITE_ONLY, snrs.size() * sizeof(dataType), NULL, NULL);
+    foldedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, foldedData.size() * sizeof(dataType), 0, 0);
+    snrs_d = cl::Buffer(*clContext, CL_MEM_WRITE_ONLY, snrs.size() * sizeof(dataType), 0, 0);
   } catch ( cl::Error &err ) {
-    std::cerr << "OpenCL error allocating memory: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+    std::cerr << "OpenCL error allocating memory: " << isa::utils::toString(err.err()) << "." << std::endl;
     return 1;
   }
 
-	srand(time(NULL));
+	srand(time(0));
   for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
     for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
       for ( unsigned int DM = 0; DM < observation.getNrDMs(); DM++ ) {
@@ -104,7 +104,7 @@ int main(int argc, char * argv[]) {
     clQueues->at(clDeviceID)[0].enqueueWriteBuffer(foldedData_d, CL_FALSE, 0, foldedData.size() * sizeof(dataType), reinterpret_cast< void * >(foldedData.data()));
     clQueues->at(clDeviceID)[0].enqueueWriteBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
   } catch ( cl::Error &err ) {
-    std::cerr << "OpenCL error H2D transfer: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+    std::cerr << "OpenCL error H2D transfer: " << isa::utils::toString(err.err()) << "." << std::endl;
     return 1;
   }
 
@@ -142,6 +142,10 @@ int main(int argc, char * argv[]) {
             break;
           }
           // Generate kernel
+          double flops = isa::utils::giga(static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods() * observation.getNrBins());
+          isa::utils::Timer timer("Kernel Timer");
+          isa::utils::Stats< double > stats;
+          cl::Event event;
           cl::Kernel * kernel;
           std::string * code = PulsarSearch::getSNROpenCL(*DMs, *periods, DMsPerThread, periodsPerThread, typeName, observation);
 
@@ -160,27 +164,23 @@ int main(int argc, char * argv[]) {
 
           // Warm-up run
           try {
-            clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local);
+            clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, 0, &event);
+            event.wait();
           } catch ( cl::Error &err ) {
-            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString(err.err()) << "." << std::endl;
             continue;
           }
           // Tuning runs
-          double flops = isa::utils::giga(static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods() * observation.getNrBins());
-          isa::utils::Timer timer("Kernel Timer");
-          isa::utils::Stats< double > stats;
-          cl::Event event;
-
           try {
             for ( unsigned int iteration = 0; iteration < nrIterations; iteration++ ) {
               timer.start();
-              clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, &event);
+              clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, 0, &event);
               event.wait();
               timer.stop();
               stats.addElement(flops / timer.getLastRunTime());
             }
           } catch ( cl::Error &err ) {
-            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
+            std::cerr << "OpenCL error kernel execution: " << isa::utils::toString(err.err()) << "." << std::endl;
             continue;
           }
 
