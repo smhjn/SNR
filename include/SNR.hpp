@@ -25,18 +25,18 @@
 
 namespace PulsarSearch {
 
-template< typename T > using snrFunc = void (*)(const AstroData::Observation< T > &, const float *, float *);
+template< typename T > using snrFunc = void (*)(const AstroData::Observation &, const float *, float *);
 
 // Sequential SNR
-template< typename T > void snrFoldedTS(const AstroData::Observation< T > & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
+template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
-template< typename T > std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation< T > & observation);
+std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation & observation);
 // SIMD SNR
 std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi = false);
 
 
 // Implementations
-template< typename T > void snrFoldedTS(AstroData::Observation< T > & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs) {
+template< typename T > void snrFoldedTS(AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs) {
 	for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
 		for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
 			T max = 0;
@@ -61,7 +61,7 @@ template< typename T > void snrFoldedTS(AstroData::Observation< T > & observatio
 	}
 }
 
-template< typename T > std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation< T > & observation) {
+std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, std::string & dataType, const AstroData::Observation & observation) {
   std::string * code = new std::string();
 
   // Begin kernel's template
@@ -138,7 +138,7 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
   // Begin kernel's template
   if ( !phi ) {
     *code = "namespace PulsarSearch {\n"
-      "template< typename T > void snrAVX" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation< T > & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
+      "template< typename T > void snrAVX" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
       "{\n"
       "__m256 max = _mm256_setzero_ps();\n"
       "__m256 average = _mm256_setzero_ps();\n"
@@ -169,7 +169,7 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
       "_mm256_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]),_mm256_div_ps(_mm256_sub_ps(max, average), rms));\n";
   } else {
     *code = "namespace PulsarSearch {\n"
-      "template< typename T > void snrPhi" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation< T > & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
+      "template< typename T > void snrPhi" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
       "{\n"
       "__m512 max = _mm512_setzero_ps();\n"
       "__m512 average = _mm512_setzero_ps();\n"
