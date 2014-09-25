@@ -43,7 +43,7 @@ int main(int argc, char * argv[]) {
 	unsigned int maxItemsPerThread = 0;
 	unsigned int maxColumns = 0;
 	unsigned int maxRows = 0;
-  AstroData::Observation< dataType > observation("SNRTuning", typeName);
+  AstroData::Observation observation;
 
 	try {
     isa::utils::ArgumentList args(argc, argv);
@@ -57,8 +57,8 @@ int main(int argc, char * argv[]) {
 		maxItemsPerThread = args.getSwitchArgument< unsigned int >("-max_items");
 		maxColumns = args.getSwitchArgument< unsigned int >("-max_columns");
 		maxRows = args.getSwitchArgument< unsigned int >("-max_rows");
-		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
-    observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
+		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
+    observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
     observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
 	} catch ( isa::utils::EmptyCommandLine &err ) {
 		std::cerr << argv[0] << " -iterations ... -opencl_platform ... -opencl_device ... -padding ... -min_threads ... -max_threads ... -max_items ... -max_columns ... -max_rows ... -dms ... -periods ... -bins ... " << std::endl;
@@ -143,7 +143,7 @@ int main(int argc, char * argv[]) {
           }
           // Generate kernel
           double flops = isa::utils::giga(static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods() * observation.getNrBins());
-          isa::utils::Timer timer("Kernel Timer");
+          isa::utils::Timer timer;
           isa::utils::Stats< double > stats;
           cl::Event event;
           cl::Kernel * kernel;

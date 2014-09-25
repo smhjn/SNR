@@ -35,7 +35,7 @@ int main(int argc, char * argv[]) {
   bool phi = false;
 	unsigned int nrIterations = 0;
 	unsigned int maxItemsPerThread = 0;
-  AstroData::Observation< float > observation("SNRTuning", "float");
+  AstroData::Observation observation;
 
 	try {
     isa::utils::ArgumentList args(argc, argv);
@@ -48,8 +48,8 @@ int main(int argc, char * argv[]) {
 		nrIterations = args.getSwitchArgument< unsigned int >("-iterations");
 		observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
 		maxItemsPerThread = args.getSwitchArgument< unsigned int >("-max_items");
-		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
-    observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
+		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
+    observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
     observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
 	} catch ( isa::Exceptions::EmptyCommandLine &err ) {
 		std::cerr << argv[0] << " [-avx] [-phi] -iterations ... -padding ... -max_items ... -dms ... -periods ... -bins ... " << std::endl;
@@ -96,7 +96,7 @@ int main(int argc, char * argv[]) {
 
       // Tuning runs
       double flops = isa::utils::giga(static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods() * observation.getNrBins());
-      isa::utils::Timer timer("Kernel Timer");
+      isa::utils::Timer timer;
       isa::utils::Stats< double > stats;
       PulsarSearch::snrFunc< float > snr = 0;
 
