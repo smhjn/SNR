@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
   unsigned int nrDMsPerThread = 0;
   unsigned int nrPeriodsPerThread = 0;
 	long long unsigned int wrongSamples = 0;
-	AstroData::Observation< float > observation("SNRTest", "float");
+	AstroData::Observation observation;
 
 	try {
     isa::utils::ArgumentList args(argc, argv);
@@ -50,8 +50,8 @@ int main(int argc, char *argv[]) {
     nrDMsPerThread = args.getSwitchArgument< unsigned int >("-dt");
     nrPeriodsPerThread = args.getSwitchArgument< unsigned int >("-pt");
 		observation.setNrDMs(args.getSwitchArgument< unsigned int >("-dms"));
-    observation.setNrPeriods(args.getSwitchArgument< unsigned int >("-periods"));
-    observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
+		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
+    observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
 	} catch  ( isa::Exceptions::SwitchNotFound &err ) {
     std::cerr << err.what() << std::endl;
     return 1;
