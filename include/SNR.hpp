@@ -28,6 +28,7 @@ namespace PulsarSearch {
 template< typename T > using snrFunc = void (*)(const AstroData::Observation &, const float *, float *);
 
 // Sequential SNR
+template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs);
 template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
 std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
@@ -36,6 +37,31 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
 
 
 // Implementations
+template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs) {
+  for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+    T max = 0;
+    float average = 0.0f;
+    float rms = 0.0f;
+
+    for ( unsigned int sample = 0; sample < observation.getNrSamplesPerSecond(); sample++ ) {
+      T value = dedispersedTS[(dm * observation.getNrSamplesPerPaddedSecond()) + sample];
+
+      average += value;
+      rms += (value * value);
+
+      if ( value > max ) {
+        max = value;
+      }
+    }
+    average /= observation.getNrSamplesPerSecond();
+    rms = std::sqrt(rms / observation.getNrSamplesPerSecond());
+
+    if ( snrs[dm] < (max - average) / rms ) {
+      snrs[dm] = (max - average) / rms;
+    }
+  }
+}
+
 template< typename T > void snrFoldedTS(AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs) {
   for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
     for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
