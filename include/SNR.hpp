@@ -92,7 +92,7 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   std::string * code = new std::string();
 
   // Begin kernel's template
-  *code = "__kernel void snr(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict snrs) {\n"
+  *code = "__kernel void snrDedispersed(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict snrs) {\n"
     "<%DEF_DM%>"
     "<%LOAD_DM%>"
     + dataType + " globalItem = 0;\n"
@@ -157,7 +157,7 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
   std::string nrPaddedDMs_s = isa::utils::toString< unsigned int >(observation.getNrPaddedDMs());
   std::string nrBinsInverse_s = isa::utils::toString< float >(1.0f / observation.getNrBins());
 
-  *code = "__kernel void snr(__global const " + dataType + " * const restrict foldedData, __global " + dataType + " * const restrict snrs) {\n"
+  *code = "__kernel void snrFolded(__global const " + dataType + " * const restrict foldedData, __global " + dataType + " * const restrict snrs) {\n"
     "<%DEF_DM%>"
     "<%DEF_PERIOD%>"
     + dataType + " globalItem = 0;\n"
