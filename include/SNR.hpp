@@ -31,7 +31,7 @@ template< typename T > using snrFunc = void (*)(const AstroData::Observation &, 
 template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs);
 template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
-std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
+std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrDMsPerThread, const std::string & dataType, const AstroData::Observation & observation);
 std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
 // SIMD SNR
 std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi = false);
@@ -88,7 +88,7 @@ template< typename T > void snrFoldedTS(AstroData::Observation & observation, co
 	}
 }
 
-std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation) {
+std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrDMsPerThread, const std::string & dataType, const AstroData::Observation & observation) {
   std::string * code = new std::string();
 
   // Begin kernel's template
