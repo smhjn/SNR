@@ -31,7 +31,8 @@ template< typename T > using snrFunc = void (*)(const AstroData::Observation &, 
 template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs);
 template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
-std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
+std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
+std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
 // SIMD SNR
 std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi = false);
 
@@ -87,7 +88,69 @@ template< typename T > void snrFoldedTS(AstroData::Observation & observation, co
 	}
 }
 
-std::string * getSNROpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation) {
+std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation) {
+  std::string * code = new std::string();
+
+  // Begin kernel's template
+  *code = "__kernel void snr(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict snrs) {\n"
+    "<%DEF_DM%>"
+    "<%LOAD_DM%>"
+    + dataType + " globalItem = 0;\n"
+    "\n"
+    "for ( unsigned int sample = 0; sample < " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + "; sample++ ) {\n"
+    "<%COMPUTE_DM%>"
+    "}\n"
+    "<%STORE_DM%>"
+    "}\n";
+    std::string defDMTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%OFFSET%>;\n"
+      + dataType + " averageDM<%DM_NUM%> = 0;\n"
+      + dataType + " rmsDM<%DM_NUM%> = 0;\n"
+      + dataType + " maxDM<%DM_NUM%> = 0;\n";
+    std::string loadDMTemplate = dataType + " snrDM<%DM_NUM%> = snrs[dm<%DM_NUM%>];\n";
+  std::string computeDMTemplate = "globalItem = dedispersedData[(sample * " + isa::utils::toString< unsigned int >(observation.getNrPaddedDMs()) + ") + dm<%DM_NUM%>];\n"
+    "averageDM<%DM_NUM%> += globalItem;\n"
+    "rmsDM<%DM_NUM%> += (globalItem * globalItem);\n"
+    "maxDM<%DM_NUM%> = fmax(maxDM<%DM_NUM%>, globalItem);\n";
+  std::string storeDMTemplate = "averageDM<%DM_NUM%> *= " + isa::utils::toString< float >(1.0f / observation.getNrSamplesPerSecond()) + "f;\n"
+    "rmsDM<%DM_NUM%> *= " + isa::utils::toString< float >(1.0f / observation.getNrSamplesPerSecond()) + "f;\n"
+    "globalItem = fmax(snrDM<%DM_NUM%>, (maxDM<%DM_NUM%> - averageDM<%DM_NUM%>) / native_sqrt(rmsDM<%DM_NUM%>));\n"
+    "snrs[dm<%DM_NUM%>] = globalItem;\n";
+  // End kernel's template
+
+  std::string * defDM_s = new std::string();
+  std::string * loadDM_s = new std::string();
+  std::string * computeDM_s = new std::string();
+  std::string * storeDM_s = new std::string();
+
+  for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
+    std::string dm_s = isa::utils::toString< unsigned int >(dm);
+    std::string offset_s = isa::utils::toString< unsigned int >(dm * nrDMsPerBlock);
+    std::string * temp_s = 0;
+
+    temp_s = isa::utils::replace(&defDMTemplate, "<%DM_NUM%>", dm_s);
+    temp_s = isa::utils::replace(temp_s, "<%OFFSET%>", offset_s, true);
+    defDM_s->append(*temp_s);
+    delete temp_s;
+    temp_s = isa::utils::replace(&loadDMTemplate, "<%DM_NUM%>", dm_s);
+    loadDM_s->append(*temp_s);
+    delete temp_s;
+    temp_s = isa::utils::replace(&computeDMTemplate, "<%DM_NUM%>", dm_s);
+    computeDM_s->append(*temp_s);
+    delete temp_s;
+    temp_s = isa::utils::replace(&storeDMTemplate, "<%DM_NUM%>", dm_s);
+    storeDM_s->append(*temp_s);
+    delete temp_s;
+  }
+
+  code = isa::utils::replace(code, "<%DEF_DM%>", *defDM_s, true);
+  code = isa::utils::replace(code, "<%LOAD_DM%>", *loadDM_s, true);
+  code = isa::utils::replace(code, "<%COMPUTE_DM%>", *computeDM_s, true);
+  code = isa::utils::replace(code, "<%STORE_DM%>", *storeDM_s, true);
+
+  return code;
+}
+
+std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation) {
   std::string * code = new std::string();
 
   // Begin kernel's template
