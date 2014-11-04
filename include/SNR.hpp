@@ -92,7 +92,7 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   std::string * code = new std::string();
 
   // Begin kernel's template
-  *code = "__kernel void snrDedispersed(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict snrs) {\n"
+  *code = "__kernel void snrDedispersed(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict maxS, __global float * const restrict meanS, __global float * const restrict rmsS) {\n"
     "<%DEF_DM%>"
     "<%LOAD_DM%>"
     + dataType + " globalItem = 0;\n"
@@ -103,18 +103,17 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
     "<%STORE_DM%>"
     "}\n";
     std::string defDMTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%OFFSET%>;\n"
-      + dataType + " averageDM<%DM_NUM%> = 0;\n"
+      + dataType + " meanDM<%DM_NUM%> = 0;\n"
       + dataType + " rmsDM<%DM_NUM%> = 0;\n"
       + dataType + " maxDM<%DM_NUM%> = 0;\n";
     std::string loadDMTemplate = dataType + " snrDM<%DM_NUM%> = snrs[dm<%DM_NUM%>];\n";
   std::string computeDMTemplate = "globalItem = dedispersedData[(sample * " + isa::utils::toString< unsigned int >(observation.getNrPaddedDMs()) + ") + dm<%DM_NUM%>];\n"
-    "averageDM<%DM_NUM%> += globalItem;\n"
+    "meanDM<%DM_NUM%> += globalItem;\n"
     "rmsDM<%DM_NUM%> += (globalItem * globalItem);\n"
     "maxDM<%DM_NUM%> = fmax(maxDM<%DM_NUM%>, globalItem);\n";
-  std::string storeDMTemplate = "averageDM<%DM_NUM%> *= " + isa::utils::toString< float >(1.0f / observation.getNrSamplesPerSecond()) + "f;\n"
-    "rmsDM<%DM_NUM%> *= " + isa::utils::toString< float >(1.0f / observation.getNrSamplesPerSecond()) + "f;\n"
-    "globalItem = fmax(snrDM<%DM_NUM%>, (maxDM<%DM_NUM%> - averageDM<%DM_NUM%>) / native_sqrt(rmsDM<%DM_NUM%>));\n"
-    "snrs[dm<%DM_NUM%>] = globalItem;\n";
+  std::string storeDMTemplate = "maxS[dm<%DM_NUM%>] = fmax(maxS[dm<%DM_NUM%>], maxDM<%DM_NUM%>);\n"
+    "meanS[dm<%DM_NUM%>] = ((meanS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + mean<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n"
+    "rmsS[dm<%DM_NUM%>] = ((rmsS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + rms<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n";
   // End kernel's template
 
   std::string * defDM_s = new std::string();
