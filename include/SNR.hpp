@@ -94,7 +94,6 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   // Begin kernel's template
   *code = "__kernel void snrDedispersed(const float second, __global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict maxS, __global float * const restrict meanS, __global float * const restrict rmsS) {\n"
     "<%DEF_DM%>"
-    "<%LOAD_DM%>"
     + dataType + " globalItem = 0;\n"
     "\n"
     "for ( unsigned int sample = 0; sample < " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + "; sample++ ) {\n"
@@ -102,22 +101,20 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
     "}\n"
     "<%STORE_DM%>"
     "}\n";
-    std::string defDMTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%OFFSET%>;\n"
-      + dataType + " meanDM<%DM_NUM%> = 0;\n"
-      + dataType + " rmsDM<%DM_NUM%> = 0;\n"
-      + dataType + " maxDM<%DM_NUM%> = 0;\n";
-    std::string loadDMTemplate = dataType + " snrDM<%DM_NUM%> = snrs[dm<%DM_NUM%>];\n";
+  std::string defDMTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%OFFSET%>;\n"
+    + dataType + " meanDM<%DM_NUM%> = 0;\n"
+    + dataType + " rmsDM<%DM_NUM%> = 0;\n"
+    + dataType + " maxDM<%DM_NUM%> = 0;\n";
   std::string computeDMTemplate = "globalItem = dedispersedData[(sample * " + isa::utils::toString< unsigned int >(observation.getNrPaddedDMs()) + ") + dm<%DM_NUM%>];\n"
     "meanDM<%DM_NUM%> += globalItem;\n"
     "rmsDM<%DM_NUM%> += (globalItem * globalItem);\n"
     "maxDM<%DM_NUM%> = fmax(maxDM<%DM_NUM%>, globalItem);\n";
   std::string storeDMTemplate = "maxS[dm<%DM_NUM%>] = fmax(maxS[dm<%DM_NUM%>], maxDM<%DM_NUM%>);\n"
-    "meanS[dm<%DM_NUM%>] = ((meanS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + mean<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n"
-    "rmsS[dm<%DM_NUM%>] = ((rmsS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + rms<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n";
+    "meanS[dm<%DM_NUM%>] = ((meanS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + meanDM<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n"
+    "rmsS[dm<%DM_NUM%>] = ((rmsS[dm<%DM_NUM%>] * " + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * second) + rmsDM<%DM_NUM%>) / (" + isa::utils::toString< unsigned int >(observation.getNrSamplesPerSecond()) + ".0f * (second + 1.0f));\n";
   // End kernel's template
 
   std::string * defDM_s = new std::string();
-  std::string * loadDM_s = new std::string();
   std::string * computeDM_s = new std::string();
   std::string * storeDM_s = new std::string();
 
@@ -130,9 +127,6 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
     temp_s = isa::utils::replace(temp_s, "<%OFFSET%>", offset_s, true);
     defDM_s->append(*temp_s);
     delete temp_s;
-    temp_s = isa::utils::replace(&loadDMTemplate, "<%DM_NUM%>", dm_s);
-    loadDM_s->append(*temp_s);
-    delete temp_s;
     temp_s = isa::utils::replace(&computeDMTemplate, "<%DM_NUM%>", dm_s);
     computeDM_s->append(*temp_s);
     delete temp_s;
@@ -142,7 +136,6 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   }
 
   code = isa::utils::replace(code, "<%DEF_DM%>", *defDM_s, true);
-  code = isa::utils::replace(code, "<%LOAD_DM%>", *loadDM_s, true);
   code = isa::utils::replace(code, "<%COMPUTE_DM%>", *computeDM_s, true);
   code = isa::utils::replace(code, "<%STORE_DM%>", *storeDM_s, true);
 
