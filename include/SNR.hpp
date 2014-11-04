@@ -92,7 +92,7 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   std::string * code = new std::string();
 
   // Begin kernel's template
-  *code = "__kernel void snrDedispersed(__global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict maxS, __global float * const restrict meanS, __global float * const restrict rmsS) {\n"
+  *code = "__kernel void snrDedispersed(const float second, __global const " + dataType + " * const restrict dedispersedData, __global " + dataType + " * const restrict maxS, __global float * const restrict meanS, __global float * const restrict rmsS) {\n"
     "<%DEF_DM%>"
     "<%LOAD_DM%>"
     + dataType + " globalItem = 0;\n"
