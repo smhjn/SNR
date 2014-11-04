@@ -28,7 +28,7 @@ namespace PulsarSearch {
 template< typename T > using snrFunc = void (*)(const AstroData::Observation &, const float *, float *);
 
 // Sequential SNR
-template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs);
+template< typename T > void snrDedispersedTS(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & maxS, std::vetor< float > & meanS, std::vector< float > & rmsS);
 template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
 std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrDMsPerThread, const std::string & dataType, const AstroData::Observation & observation);
@@ -38,28 +38,28 @@ std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int n
 
 
 // Implementations
-template< typename T > void snrDedispersedTS(const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & snrs) {
+template< typename T > void snrDedispersedTS(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & maxS, std::vetor< float > & meanS, std::vector< float > & rmsS) {
   for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
     T max = 0;
-    float average = 0.0f;
+    float mean = 0.0f;
     float rms = 0.0f;
 
     for ( unsigned int sample = 0; sample < observation.getNrSamplesPerSecond(); sample++ ) {
       T value = dedispersedTS[(dm * observation.getNrSamplesPerPaddedSecond()) + sample];
 
-      average += value;
+      mean += value;
       rms += (value * value);
 
       if ( value > max ) {
         max = value;
       }
     }
-    average /= observation.getNrSamplesPerSecond();
-    rms = std::sqrt(rms / observation.getNrSamplesPerSecond());
 
-    if ( snrs[dm] < (max - average) / rms ) {
-      snrs[dm] = (max - average) / rms;
+    if ( max > maxS[dm] ) {
+      maxS[dm] = max;
     }
+    meanS[dm] = ((meanS[dm] * observation.getNrSamplesPerSecond() * second) + mean) / (observation.getNrSamplesPerSecond() * (second + 1));
+    rmsS[dm] = ((rmsS[dm] * observation.getNrSamplesPerSecond() * second) + rms) / (observation.getNrSamplesPerSecond() * (second + 1));
   }
 }
 
