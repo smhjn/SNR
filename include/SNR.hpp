@@ -136,8 +136,11 @@ std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const un
   }
 
   code = isa::utils::replace(code, "<%DEF_DM%>", *defDM_s, true);
+  delete defDM_s;
   code = isa::utils::replace(code, "<%COMPUTE_DM%>", *computeDM_s, true);
+  delete computeDM_s;
   code = isa::utils::replace(code, "<%STORE_DM%>", *storeDM_s, true);
+  delete storeDM_s;
 
   return code;
 }
@@ -150,34 +153,35 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
   std::string nrBinsInverse_s = isa::utils::toString< float >(1.0f / observation.getNrBins());
 
   *code = "__kernel void snrFolded(__global const " + dataType + " * const restrict foldedData, __global " + dataType + " * const restrict snrs) {\n"
+    + dataType + " globalItem = 0;\n"
     "<%DEF_DM%>"
     "<%DEF_PERIOD%>"
-    + dataType + " globalItem = 0;\n"
-    + dataType + " average = 0;\n"
-    + dataType + " rms = 0;\n"
-    + dataType + " max = 0;\n"
+    "<%DEF_DM_PERIOD%>"
     "\n"
+    "for ( unsigned int bin = 0; bin < " + isa::utils::toString< unsigned int >(observation.getNrBins()) + "; bin++ ) {\n"
     "<%COMPUTE%>"
+    "}\n"
+    "<%STORE%>"
     "}\n";
     std::string defDMsTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%DM_NUM%>;\n";
   std::string defPeriodsTemplate = "const unsigned int period<%PERIOD_NUM%> = (get_group_id(1) * " + isa::utils::toString< unsigned int >(nrPeriodsPerBlock * nrPeriodsPerThread) + ") + get_local_id(1) + <%PERIOD_NUM%>;\n";
-  std::string computeTemplate = "average = 0;\n"
-    "rms = 0;\n"
-    "max = 0;\n"
-    "for ( unsigned int bin = 0; bin < " + isa::utils::toString< unsigned int >(observation.getNrBins()) + "; bin++ ) {\n"
-    "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + (period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>];\n"
-    "average += globalItem;\n"
-    "rms += (globalItem * globalItem);\n"
-    "max = fmax(max, globalItem);\n"
-    "}\n"
-    "average *= " + nrBinsInverse_s + "f;\n"
-    "rms *= " + nrBinsInverse_s + "f;\n"
-    "snrs[(period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>] = (max - average) / native_sqrt(rms);\n";
+  std::string defDMsPeriodsTemplate = dataType + " averageDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n"
+    + dataType + " rmsDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n"
+    + dataType + " maxDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n";
+  std::string computeTemplate = "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + (period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>];\n"
+    "averageDM<%DM_NUM%>p<%PERIOD_NUM%> += globalItem;\n"
+    "rmsDM<%DM_NUM%>p<%PERIOD_NUM%> += (globalItem * globalItem);\n"
+    "maxDM<%DM_NUM%>p<%PERIOD_NUM%> = fmax(maxDM<%DM_NUM%>p<%PERIOD_NUM%>, globalItem);\n";
+  std::string storeTemplate = "averageDM<%DM_NUM%>p<%PERIOD_NUM%> *= " + nrBinsInverse_s + "f;\n"
+    "rmsDM<%DM_NUM%>p<%PERIOD_NUM%> *= " + nrBinsInverse_s + "f;\n"
+    "snrs[(period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>] = (maxDM<%DM_NUM%>p<%PERIOD_NUM%> - averageDM<%DM_NUM%>p<%PERIOD_NUM%>) / native_sqrt(rmsDM<%DM_NUM%>p<%PERIOD_NUM%>);\n";
   // End kernel's template
 
   std::string * defDM_s = new std::string();
   std::string * defPeriod_s = new std::string();
+  std::string * defDMPeriod_s = new std::string();
   std::string * compute_s = new std::string();
+  std::string * store_s = new std::string();
 
   for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
     std::string dm_s = isa::utils::toString< unsigned int >(dm);
@@ -198,16 +202,31 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
     for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
       std::string dm_s = isa::utils::toString< unsigned int >(dm);
 
-      temp_s = isa::utils::replace(&computeTemplate, "<%PERIOD_NUM%>", period_s);
-      temp_s = isa::utils::replace(temp_s, "<%DM_NUM%>", dm_s, true);
+      temp_s = isa::utils::replace(&defDMsPeriodsTemplate, "<%DM_NUM%>", dm_s);
+      temp_s = isa::utils::replace(temp_s, "<%PERIOD_NUM%>", period_s, true);
+      defDMPeriod_s->append(*temp_s);
+      delete temp_s;
+      temp_s = isa::utils::replace(&computeTemplate, "<%DM_NUM%>", dm_s);
+      temp_s = isa::utils::replace(temp_s, "<%PERIOD_NUM%>", period_s, true);
       compute_s->append(*temp_s);
+      delete temp_s;
+      temp_s = isa::utils::replace(&storeTemplate, "<%DM_NUM%>", dm_s);
+      temp_s = isa::utils::replace(temp_s, "<%PERIOD_NUM%>", period_s, true);
+      store_s->append(*temp_s);
       delete temp_s;
     }
   }
 
   code = isa::utils::replace(code, "<%DEF_DM%>", *defDM_s, true);
+  delete defDM_s;
   code = isa::utils::replace(code, "<%DEF_PERIOD%>", *defPeriod_s, true);
+  delete defPeriod_s;
+  code = isa::utils::replace(code, "<%DEF_DM_PERIOD%>", *defDMPeriod_s, true);
+  delete defDMPeriod_s;
   code = isa::utils::replace(code, "<%COMPUTE%>", *compute_s, true);
+  delete compute_s;
+  code = isa::utils::replace(code, "<%STORE%>", *store_s, true);
+  delete store_s;
 
   return code;
 }
