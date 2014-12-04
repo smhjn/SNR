@@ -50,6 +50,8 @@ int main(int argc, char *argv[]) {
     if ( fSNR ) {
       nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
       nrPeriodsPerThread = args.getSwitchArgument< unsigned int >("-pt");
+    } else {
+      observation.setNrSamplesPerSecond(args.getSwitchArgument< unsigned int >("-samples"));
     }
 		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
     if ( fSNR ) {
@@ -61,6 +63,7 @@ int main(int argc, char *argv[]) {
     return 1;
   } catch ( std::exception &err ) {
     std::cerr << "Usage: " << argv[0] << " [-dedispersed | -folded] -type ... -padding ... -db ... -dt ... -dms ..." << std::endl;
+    std::cerr << "\t -dedispersed -samples ..." << std::endl;
     std::cerr << "\t -folded -pb ... -pt ... -periods .... -bins ..." << std::endl;
 		return 1;
 	}
