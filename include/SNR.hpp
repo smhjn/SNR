@@ -163,12 +163,12 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
     "}\n"
     "<%STORE%>"
     "}\n";
-    std::string defDMsTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%DM_NUM%>;\n";
-  std::string defPeriodsTemplate = "const unsigned int period<%PERIOD_NUM%> = (get_group_id(1) * " + isa::utils::toString< unsigned int >(nrPeriodsPerBlock * nrPeriodsPerThread) + ") + get_local_id(1) + <%PERIOD_NUM%>;\n";
+    std::string defDMsTemplate = "const unsigned int dm<%DM_NUM%> = (get_group_id(0) * " + isa::utils::toString< unsigned int >(nrDMsPerBlock * nrDMsPerThread) + ") + get_local_id(0) + <%DM_OFFSET%>;\n";
+  std::string defPeriodsTemplate = "const unsigned int period<%PERIOD_NUM%> = (get_group_id(1) * " + isa::utils::toString< unsigned int >(nrPeriodsPerBlock * nrPeriodsPerThread) + ") + get_local_id(1) + <%PERIOD_OFFSET%>;\n";
   std::string defDMsPeriodsTemplate = dataType + " averageDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n"
     + dataType + " rmsDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n"
     + dataType + " maxDM<%DM_NUM%>p<%PERIOD_NUM%> = 0;\n";
-  std::string computeTemplate = "globalItem = foldedData[(bin * " + isa::utils::toString< unsigned int >(observation.getNrPeriods()) + " * " + nrPaddedDMs_s + ") + (period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>];\n"
+  std::string computeTemplate = "globalItem = foldedData[(bin * " + isa::utils::toString(observation.getNrPeriods() * observation.getNrPaddedDMs()) + ") + (period<%PERIOD_NUM%> * " + nrPaddedDMs_s + ") + dm<%DM_NUM%>];\n"
     "averageDM<%DM_NUM%>p<%PERIOD_NUM%> += globalItem;\n"
     "rmsDM<%DM_NUM%>p<%PERIOD_NUM%> += (globalItem * globalItem);\n"
     "maxDM<%DM_NUM%>p<%PERIOD_NUM%> = fmax(maxDM<%DM_NUM%>p<%PERIOD_NUM%>, globalItem);\n";
@@ -188,6 +188,13 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
     std::string * temp_s = 0;
 
     temp_s = isa::utils::replace(&defDMsTemplate, "<%DM_NUM%>", dm_s);
+    if ( dm == 0 ) {
+      std::string empty_s;
+      temp_s = isa::utils::replace(temp_s, " + <%DM_OFFSET%>", empty_s, true);
+    } else {
+      std::string offset_s = isa::utils::toString(dm * nrDMsPerBlock);
+      temp_s = isa::utils::replace(temp_s, "<%DM_OFFSET%>", offset_s, true);
+    }
     defDM_s->append(*temp_s);
     delete temp_s;
   }
@@ -196,6 +203,13 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
     std::string * temp_s = 0;
 
     temp_s = isa::utils::replace(&defPeriodsTemplate, "<%PERIOD_NUM%>", period_s);
+    if ( period == 0 ) {
+      std::string empty_s;
+      temp_s = isa::utils::replace(temp_s, " + <%PERIOD_OFFSET%>", empty_s, true);
+    } else {
+      std::string offset_s = isa::utils::toString(period * nrDMsPerBlock);
+      temp_s = isa::utils::replace(temp_s, "<%PERIOD_OFFSET%>", offset_s, true);
+    }
     defPeriod_s->append(*temp_s);
     delete temp_s;
 
