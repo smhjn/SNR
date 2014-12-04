@@ -34,6 +34,7 @@ std::string typeName("float");
 
 int main(int argc, char *argv[]) {
   bool print = false;
+  bool dSNR = false;
 	unsigned int clPlatformID = 0;
 	unsigned int clDeviceID = 0;
   unsigned int nrDMsPerBlock = 0;
@@ -46,21 +47,35 @@ int main(int argc, char *argv[]) {
 	try {
     isa::utils::ArgumentList args(argc, argv);
     print = args.getSwitch("-print");
+    dSNR = args.getSwitch("-dedispersed");
+    bool fSNR = args.getSwitch("-folded");
+    if ( (dSNR && fSNR) || (!dSNR && ! fSNR) ) {
+      throw std::exception();
+    }
 		clPlatformID = args.getSwitchArgument< unsigned int >("-opencl_platform");
 		clDeviceID = args.getSwitchArgument< unsigned int >("-opencl_device");
     observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
     nrDMsPerBlock = args.getSwitchArgument< unsigned int >("-db");
     nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
     nrDMsPerThread = args.getSwitchArgument< unsigned int >("-dt");
-    nrPeriodsPerThread = args.getSwitchArgument< unsigned int >("-pt");
+    if ( fSNR ) {
+      nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
+      nrPeriodsPerThread = args.getSwitchArgument< unsigned int >("-pt");
+    } else {
+      observation.setNrSamplesPerSecond(args.getSwitchArgument< unsigned int >("-samples"));
+    }
 		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
-    observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
-    observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
+    if ( fSNR ) {
+      observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
+      observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
+    }
 	} catch  ( isa::utils::SwitchNotFound &err ) {
     std::cerr << err.what() << std::endl;
     return 1;
-  }catch ( std::exception &err ) {
-    std::cerr << "Usage: " << argv[0] << " [-print] -opencl_platform ... -opencl_device ... -padding ... -db ... -pb ... -dt ... -pt ... -dms ... -periods ... -bins ..." << std::endl;
+  } catch ( std::exception &err ) {
+    std::cerr << "Usage: " << argv[0] << " [-dedispersed | -folded] [-print] -opencl_platform ... -opencl_device ... -padding ... -db ... -dt ... -dms ..." << std::endl;
+    std::cerr << "\t -dedispersed -samples ..." << std::endl;
+    std::cerr << "\t -folded -pb ... -pt ... -periods .... -bins ..." << std::endl;
 		return 1;
 	}
 
@@ -73,34 +88,74 @@ int main(int argc, char *argv[]) {
   isa::OpenCL::initializeOpenCL(clPlatformID, 1, clPlatforms, clContext, clDevices, clQueues);
 
 	// Allocate memory
-  std::vector< dataType > foldedData = std::vector< dataType >(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedDMs());
-  cl::Buffer foldedData_d;
-  std::vector< dataType > snrs = std::vector< dataType >(observation.getNrPeriods() * observation.getNrPaddedDMs());
-  std::vector< dataType > snrs_c = std::vector< dataType >(observation.getNrPeriods() * observation.getNrPaddedDMs());
-  cl::Buffer snrs_d;
+  std::vector< dataType > foldedData, snrs, snrs_c;
+  std::vector< dataType > transposedData, maxS, meanS, rmsS, maxS_c, meanS_c, rmsS_c;
+  cl::Buffer foldedData_d, snrs_d;
+  cl::Buffer tranposedData_d, maxS_d, meanS_d, rmsS_d;
+  if ( dSNR ) {
+    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
+    snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
+    snrs_c.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
+  } else {
+    tranposedData.resize(observation.getNrSamplesPerSecond() * observation.getNrPaddedDMs());
+    maxS.resize(observation.getNrPaddedDMs());
+    meanS.resize(observation.getNrPaddedDMs());
+    rmsS.resize(observation.getNrPaddedDMs());
+    maxS_c.resize(observation.getNrPaddedDMs());
+    meanS_c.resize(observation.getNrPaddedDMs());
+    rmsS_c.resize(observation.getNrPaddedDMs());
+  }
   try {
-    foldedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, foldedData.size() * sizeof(dataType), NULL, NULL);
-    snrs_d = cl::Buffer(*clContext, CL_MEM_WRITE_ONLY, snrs.size() * sizeof(dataType), NULL, NULL);
+    if ( dSNR ) {
+      transposedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, transposedData.size() * sizeof(dataType), 0, 0);
+      maxS_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, maxS.size() * sizeof(dataType), 0, 0);
+      meanS_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, meanS.size() * sizeof(dataType), 0, 0);
+      rmsS_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, rmsS.size() * sizeof(dataType), 0, 0);
+    } else {
+      foldedData_d = cl::Buffer(*clContext, CL_MEM_READ_WRITE, foldedData.size() * sizeof(dataType), 0, 0);
+      snrs_d = cl::Buffer(*clContext, CL_MEM_WRITE_ONLY, snrs.size() * sizeof(dataType), 0, 0);
+    }
   } catch ( cl::Error &err ) {
     std::cerr << "OpenCL error allocating memory: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
     return 1;
   }
 
-	srand(time(NULL));
-  for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
-    for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
-      for ( unsigned int DM = 0; DM < observation.getNrDMs(); DM++ ) {
-        foldedData[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + DM] = static_cast< dataType >(rand() % 10);
+	srand(time(0));
+  if ( dSNR ) {
+    for ( unsigned int sample = 0; sample < observation.getNrSamplesPerSecond(); sample++ ) {
+      for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+        transposedData[(sample * observation.getNrPaddedDMs()) + dm] = static_cast< dataType >(rand() % 10);
       }
     }
-	}
-  std::fill(snrs.begin(), snrs.end(), static_cast< dataType >(0));
-  std::fill(snrs_c.begin(), snrs_c.end(), static_cast< dataType >(0));
+    std::fill(maxS.begin(), maxS.end(), static_cast< dataType >(0));
+    std::fill(meanS.begin(), meanS.end(), static_cast< dataType >(0));
+    std::fill(rmsS.begin(), rmsS.end(), static_cast< dataType >(0));
+    std::fill(maxS_c.begin(), maxS_c.end(), static_cast< dataType >(0));
+    std::fill(meanS_c.begin(), meanS_c.end(), static_cast< dataType >(0));
+    std::fill(rmsS_c.begin(), rmsS_c.end(), static_cast< dataType >(0));
+  } else {
+    for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
+      for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+        for ( unsigned int DM = 0; DM < observation.getNrDMs(); DM++ ) {
+          foldedData[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + DM] = static_cast< dataType >(rand() % 10);
+        }
+      }
+    }
+    std::fill(snrs.begin(), snrs.end(), static_cast< dataType >(0));
+    std::fill(snrs_c.begin(), snrs_c.end(), static_cast< dataType >(0));
+  }
 
   // Copy data structures to device
   try {
-    clQueues->at(clDeviceID)[0].enqueueWriteBuffer(foldedData_d, CL_FALSE, 0, foldedData.size() * sizeof(dataType), reinterpret_cast< void * >(foldedData.data()));
-    clQueues->at(clDeviceID)[0].enqueueWriteBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
+    if ( dSNR ) {
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(transposedData_d, CL_FALSE, 0, transposedData.size() * sizeof(dataType), reinterpret_cast< void * >(transposedData.data()));
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(maxS_d, CL_FALSE, 0, maxS.size() * sizeof(dataType), reinterpret_cast< void * >(maxS.data()));
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(meanS_d, CL_FALSE, 0, meanS.size() * sizeof(dataType), reinterpret_cast< void * >(meanS.data()));
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(rmsS_d, CL_FALSE, 0, rmsS.size() * sizeof(dataType), reinterpret_cast< void * >(rmsS.data()));
+    } else {
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(foldedData_d, CL_FALSE, 0, foldedData.size() * sizeof(dataType), reinterpret_cast< void * >(foldedData.data()));
+      clQueues->at(clDeviceID)[0].enqueueWriteBuffer(snrs_d, CL_FALSE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
+    }
   } catch ( cl::Error &err ) {
     std::cerr << "OpenCL error H2D transfer: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
     return 1;
@@ -108,13 +163,22 @@ int main(int argc, char *argv[]) {
 
   // Generate kernel
   cl::Kernel * kernel;
-  std::string * code = PulsarSearch::getSNROpenCL(nrDMsPerBlock, nrPeriodsPerBlock, nrDMsPerThread, nrPeriodsPerThread, typeName, observation);
+  std::string * code;
+  if ( dSNR ) {
+    code = PulsarSearch::getSNRDedispersedOpenCL(nrDMsPerBlock, nrDMsPerThread, typeName, observation);
+  } else {
+    code = PulsarSearch::getSNRFoldedOpenCL(nrDMsPerBlock, nrPeriodsPerBlock, nrDMsPerThread, nrPeriodsPerThread, typeName, observation);
+  }
   if ( print ) {
     std::cout << *code << std::endl;
   }
 
   try {
-    kernel = isa::OpenCL::compile("snr", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
+    if ( dSNR ) {
+      kernel = isa::OpenCL::compile("snrDedispersed", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
+    } else {
+      kernel = isa::OpenCL::compile("snrFolded", *code, "-cl-mad-enable -Werror", *clContext, clDevices->at(clDeviceID));
+    }
   } catch ( isa::OpenCL::OpenCLError &err ) {
     std::cerr << err.what() << std::endl;
     return 1;
@@ -122,30 +186,64 @@ int main(int argc, char *argv[]) {
 
   // Run OpenCL kernel and CPU control
   try {
-    cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread, observation.getNrPeriods() / nrPeriodsPerThread);
-    cl::NDRange local(nrDMsPerBlock, nrPeriodsPerBlock);
+    cl::NDRange global;
+    cl::NDRange local;
+    if ( dSNR ) {
+      cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread);
+      cl::NDRange local(nrDMsPerBlock);
 
-    kernel->setArg(0, foldedData_d);
-    kernel->setArg(1, snrs_d);
+      kernel->setArg(0, 0);
+      kernel->setArg(1, transposedData_d);
+      kernel->setArg(2, maxS_d);
+      kernel->setArg(3, meanS_d);
+      kernel->setArg(4, rmsS_d);
+    } else {
+      cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread, observation.getNrPeriods() / nrPeriodsPerThread);
+      cl::NDRange local(nrDMsPerBlock, nrPeriodsPerBlock);
+
+      kernel->setArg(0, foldedData_d);
+      kernel->setArg(1, snrs_d);
+    }
     
-    clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, NULL, NULL);
-    PulsarSearch::snrFoldedTS(observation, foldedData, snrs_c);
-    clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_TRUE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
+    clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, 0, 0);
+    if ( dSNR ) {
+      PulsarSearch::snrDedispersedTS(0, observation, transposedData, maxS_c, meanS_c, rmsS_c);
+      clQueues->at(clDeviceID)[0].enqueueReadBuffer(maxS_d, CL_TRUE, 0, maxS.size() * sizeof(dataType), reinterpret_cast< void * >(maxS.data()));
+      clQueues->at(clDeviceID)[0].enqueueReadBuffer(meanS_d, CL_TRUE, 0, meanS.size() * sizeof(dataType), reinterpret_cast< void * >(meanS.data()));
+      clQueues->at(clDeviceID)[0].enqueueReadBuffer(rmsS_d, CL_TRUE, 0, rmsS.size() * sizeof(dataType), reinterpret_cast< void * >(rmsS.data()));
+    } else {
+      PulsarSearch::snrFoldedTS(observation, foldedData, snrs_c);
+      clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_TRUE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
+    }
   } catch ( cl::Error &err ) {
     std::cerr << "OpenCL error: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
     return 1;
   }
 
-  for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
-    for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
-      if ( ! isa::utils::same(snrs_c[(period * observation.getNrPaddedDMs()) + dm], snrs[(period * observation.getNrPaddedDMs()) + dm]) ) {
+  if ( dSNR) {
+    for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+      dataType snr = (maxS[dm] - meanS[dm]) / std::sqrt(rmsS[dm]);
+      dataType snr_c = (maxS_c[dm] - meanS_c[dm]) / std::sqrt(rmsS_c[dm]);
+      if ( ! isa::utils::same(snr, snr_c) ) {
         wrongSamples++;
+      }
+    }
+  } else {
+    for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+      for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+        if ( ! isa::utils::same(snrs_c[(period * observation.getNrPaddedDMs()) + dm], snrs[(period * observation.getNrPaddedDMs()) + dm]) ) {
+          wrongSamples++;
+        }
       }
     }
   }
 
   if ( wrongSamples > 0 ) {
-    std::cout << "Wrong samples: " << wrongSamples << " (" << (wrongSamples * 100.0) / (static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods()) << "%)." << std::endl;
+    if ( dSNR ) {
+      std::cout << "Wrong samples: " << wrongSamples << " (" << (wrongSamples * 100.0) / static_cast< long long unsigned int >(observation.getNrDMs()) << "%)." << std::endl;
+    } else {
+      std::cout << "Wrong samples: " << wrongSamples << " (" << (wrongSamples * 100.0) / (static_cast< long long unsigned int >(observation.getNrDMs()) * observation.getNrPeriods()) << "%)." << std::endl;
+    }
   } else {
     std::cout << "TEST PASSED." << std::endl;
   }
