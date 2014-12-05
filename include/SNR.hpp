@@ -207,7 +207,7 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
       std::string empty_s;
       temp_s = isa::utils::replace(temp_s, " + <%PERIOD_OFFSET%>", empty_s, true);
     } else {
-      std::string offset_s = isa::utils::toString(period * nrDMsPerBlock);
+      std::string offset_s = isa::utils::toString(period * nrPeriodsPerBlock);
       temp_s = isa::utils::replace(temp_s, "<%PERIOD_OFFSET%>", offset_s, true);
     }
     defPeriod_s->append(*temp_s);
