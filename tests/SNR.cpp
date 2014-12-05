@@ -33,7 +33,8 @@ std::string typeName("float");
 
 
 int main(int argc, char *argv[]) {
-  bool print = false;
+  bool printCode = false;
+  bool printResults = false;
   bool dSNR = false;
 	unsigned int clPlatformID = 0;
 	unsigned int clDeviceID = 0;
@@ -46,7 +47,8 @@ int main(int argc, char *argv[]) {
 
 	try {
     isa::utils::ArgumentList args(argc, argv);
-    print = args.getSwitch("-print");
+    printCode = args.getSwitch("-print_code");
+    printResults = args.getSwitch("-print_res");
     dSNR = args.getSwitch("-dedispersed");
     bool fSNR = args.getSwitch("-folded");
     if ( (dSNR && fSNR) || (!dSNR && ! fSNR) ) {
@@ -72,7 +74,7 @@ int main(int argc, char *argv[]) {
     std::cerr << err.what() << std::endl;
     return 1;
   } catch ( std::exception &err ) {
-    std::cerr << "Usage: " << argv[0] << " [-dedispersed | -folded] [-print] -opencl_platform ... -opencl_device ... -padding ... -db ... -dt ... -dms ..." << std::endl;
+    std::cerr << "Usage: " << argv[0] << " [-dedispersed | -folded] [-print_code] [-print_res] -opencl_platform ... -opencl_device ... -padding ... -db ... -dt ... -dms ..." << std::endl;
     std::cerr << "\t -dedispersed -samples ..." << std::endl;
     std::cerr << "\t -folded -pb ... -pt ... -periods .... -bins ..." << std::endl;
 		return 1;
@@ -168,7 +170,7 @@ int main(int argc, char *argv[]) {
   } else {
     code = PulsarSearch::getSNRFoldedOpenCL(nrDMsPerBlock, nrPeriodsPerBlock, nrDMsPerThread, nrPeriodsPerThread, typeName, observation);
   }
-  if ( print ) {
+  if ( printCode ) {
     std::cout << *code << std::endl;
   }
 
@@ -225,14 +227,30 @@ int main(int argc, char *argv[]) {
       dataType snr_c = (maxS_c[dm] - meanS_c[dm]) / std::sqrt(rmsS_c[dm]);
       if ( ! isa::utils::same(snr, snr_c) ) {
         wrongSamples++;
+        if ( printResults ) {
+          std::cout << "**" << snr << " != " << snr_c << "** ";
+        }
+      } else if (printResults ) {
+        std::cout << snr << " ";
       }
+    }
+    if ( printResults ) {
+      std::cout << std::endl;
     }
   } else {
     for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
       for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
         if ( ! isa::utils::same(snrs_c[(period * observation.getNrPaddedDMs()) + dm], snrs[(period * observation.getNrPaddedDMs()) + dm]) ) {
           wrongSamples++;
+          if ( printResults ) {
+            std::cout << "**" << snrs[(period * observation.getNrPaddedDMs()) + dm] << " != " << snrs_c[(period * observation.getNrPaddedDMs()) + dm] << "** ";
+          }
+        } else if ( printResults ) {
+          std::cout << snrs[(period * observation.getNrPaddedDMs()) + dm] << "  ";
         }
+      }
+      if ( printResults ) {
+        std::cout << std::endl;
       }
     }
   }
