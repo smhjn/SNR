@@ -69,10 +69,11 @@ int main(int argc, char * argv[]) {
 		maxRows = args.getSwitchArgument< unsigned int >("-max_rows");
     if ( dSNR ) {
       observation.setNrSamplesPerSecond(args.getSwitchArgument< unsigned int >("-samples"));
+    } else {
+      observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
+      observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
     }
 		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
-    observation.setPeriodRange(args.getSwitchArgument< unsigned int >("-periods"), 0, 0);
-    observation.setNrBins(args.getSwitchArgument< unsigned int >("-bins"));
 	} catch ( isa::utils::EmptyCommandLine & err ) {
 		std::cerr << argv[0] << " [-dedispersed | -folded] -iterations ... -opencl_platform ... -opencl_device ... -padding ... -thread_unit ... -thread_inc ... -min_threads ... -max_threads ... -max_items ... -max_columns ... -max_rows ... -dms ..." << std::endl;
     std::cerr << "\t -dedispersed -samples ..." << std::endl;
