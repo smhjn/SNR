@@ -103,7 +103,7 @@ int main(int argc, char * argv[]) {
     meanS.resize(observation.getNrPaddedDMs());
     rmsS.resize(observation.getNrPaddedDMs());
   } else {
-    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
+    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedDMs());
     snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
   }
   try {
