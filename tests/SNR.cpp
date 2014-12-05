@@ -91,13 +91,13 @@ int main(int argc, char *argv[]) {
   std::vector< dataType > foldedData, snrs, snrs_c;
   std::vector< dataType > transposedData, maxS, meanS, rmsS, maxS_c, meanS_c, rmsS_c;
   cl::Buffer foldedData_d, snrs_d;
-  cl::Buffer tranposedData_d, maxS_d, meanS_d, rmsS_d;
+  cl::Buffer transposedData_d, maxS_d, meanS_d, rmsS_d;
   if ( dSNR ) {
     foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
     snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
     snrs_c.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
   } else {
-    tranposedData.resize(observation.getNrSamplesPerSecond() * observation.getNrPaddedDMs());
+    transposedData.resize(observation.getNrSamplesPerSecond() * observation.getNrPaddedDMs());
     maxS.resize(observation.getNrPaddedDMs());
     meanS.resize(observation.getNrPaddedDMs());
     rmsS.resize(observation.getNrPaddedDMs());
