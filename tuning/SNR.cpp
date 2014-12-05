@@ -239,6 +239,7 @@ int main(int argc, char * argv[]) {
           std::cerr << "OpenCL error kernel execution: " << isa::utils::toString(err.err()) << "." << std::endl;
           continue;
         }
+        delete kernel;
 
         std::cout << observation.getNrDMs() << " " << observation.getNrSamplesPerSecond() << " ";
         std::cout << *DMs << " " << DMsPerThread << " ";
