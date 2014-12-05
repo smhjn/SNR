@@ -76,7 +76,7 @@ int main(int argc, char * argv[]) {
 	} catch ( isa::utils::EmptyCommandLine & err ) {
 		std::cerr << argv[0] << " [-dedispersed | -folded] -iterations ... -opencl_platform ... -opencl_device ... -padding ... -thread_unit ... -thread_inc ... -min_threads ... -max_threads ... -max_items ... -max_columns ... -max_rows ... -dms ..." << std::endl;
     std::cerr << "\t -dedispersed -samples ..." << std::endl;
-    std::cerr << "\t -folded -pb ... -pt ... -periods .... -bins ..." << std::endl;
+    std::cerr << "\t -folded -periods .... -bins ..." << std::endl;
 		return 1;
 	} catch ( std::exception & err ) {
 		std::cerr << err.what() << std::endl;
