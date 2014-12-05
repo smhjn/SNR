@@ -56,7 +56,6 @@ int main(int argc, char *argv[]) {
 		clDeviceID = args.getSwitchArgument< unsigned int >("-opencl_device");
     observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
     nrDMsPerBlock = args.getSwitchArgument< unsigned int >("-db");
-    nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
     nrDMsPerThread = args.getSwitchArgument< unsigned int >("-dt");
     if ( fSNR ) {
       nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
