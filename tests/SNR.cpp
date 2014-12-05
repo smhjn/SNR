@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
     meanS_c.resize(observation.getNrPaddedDMs());
     rmsS_c.resize(observation.getNrPaddedDMs());
   } else {
-    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
+    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedDMs());
     snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
     snrs_c.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
   }
