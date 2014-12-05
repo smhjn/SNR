@@ -130,9 +130,6 @@ int main(int argc, char * argv[]) {
     std::fill(maxS.begin(), maxS.end(), static_cast< dataType >(0));
     std::fill(meanS.begin(), meanS.end(), static_cast< dataType >(0));
     std::fill(rmsS.begin(), rmsS.end(), static_cast< dataType >(0));
-    std::fill(maxS_c.begin(), maxS_c.end(), static_cast< dataType >(0));
-    std::fill(meanS_c.begin(), meanS_c.end(), static_cast< dataType >(0));
-    std::fill(rmsS_c.begin(), rmsS_c.end(), static_cast< dataType >(0));
   } else {
     for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
       for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
@@ -142,7 +139,6 @@ int main(int argc, char * argv[]) {
       }
     }
     std::fill(snrs.begin(), snrs.end(), static_cast< dataType >(0));
-    std::fill(snrs_c.begin(), snrs_c.end(), static_cast< dataType >(0));
   }
 
   // Copy data structures to device
