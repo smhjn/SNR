@@ -98,13 +98,13 @@ int main(int argc, char * argv[]) {
   cl::Buffer foldedData_d, snrs_d;
   cl::Buffer transposedData_d, maxS_d, meanS_d, rmsS_d;
   if ( dSNR ) {
-    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
-    snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
-  } else {
     transposedData.resize(observation.getNrSamplesPerSecond() * observation.getNrPaddedDMs());
     maxS.resize(observation.getNrPaddedDMs());
     meanS.resize(observation.getNrPaddedDMs());
     rmsS.resize(observation.getNrPaddedDMs());
+  } else {
+    foldedData.resize(observation.getNrBins() * observation.getNrPeriods() * observation.getNrPaddedBins());
+    snrs.resize(observation.getNrPeriods() * observation.getNrPaddedDMs());
   }
   try {
     if ( dSNR ) {
