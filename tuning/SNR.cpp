@@ -54,7 +54,7 @@ int main(int argc, char * argv[]) {
     dSNR = args.getSwitch("-dedispersed");
     bool fSNR = args.getSwitch("-folded");
     if ( (dSNR && fSNR) || (!dSNR && ! fSNR) ) {
-      throw std::exception();
+      throw isa::utils::EmptyCommandLine();
     }
 		nrIterations = args.getSwitchArgument< unsigned int >("-iterations");
 		clPlatformID = args.getSwitchArgument< unsigned int >("-opencl_platform");
