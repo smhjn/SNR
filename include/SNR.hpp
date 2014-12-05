@@ -64,14 +64,14 @@ template< typename T > void snrDedispersedTS(const unsigned int second, const As
 }
 
 template< typename T > void snrFoldedTS(AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs) {
-  for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
-    for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+  for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
+    for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
 			T max = 0;
 			float average = 0.0f;
 			float rms = 0.0f;
 
 			for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
-				T value = foldedTS[(dm * observation.getNrPeriods() * observation.getNrPaddedBins()) + (period * observation.getNrPaddedBins()) + bin];
+				T value = foldedTS[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + dm];
 
 				average += value;
 				rms += (value * value);
@@ -83,7 +83,7 @@ template< typename T > void snrFoldedTS(AstroData::Observation & observation, co
 			average /= observation.getNrBins();
 			rms = std::sqrt(rms / observation.getNrBins());
 
-			snrs[(dm * observation.getNrPaddedPeriods()) + period] = (max - average) / rms;
+			snrs[(period * observation.getNrPaddedDMs()) + dm] = (max - average) / rms;
 		}
 	}
 }
