@@ -188,8 +188,8 @@ int main(int argc, char *argv[]) {
     cl::NDRange global;
     cl::NDRange local;
     if ( dSNR ) {
-      cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread);
-      cl::NDRange local(nrDMsPerBlock);
+      global = cl::NDRange(observation.getNrPaddedDMs() / nrDMsPerThread);
+      local = cl::NDRange(nrDMsPerBlock);
 
       kernel->setArg(0, 0);
       kernel->setArg(1, transposedData_d);
@@ -197,8 +197,8 @@ int main(int argc, char *argv[]) {
       kernel->setArg(3, meanS_d);
       kernel->setArg(4, rmsS_d);
     } else {
-      cl::NDRange global(observation.getNrPaddedDMs() / nrDMsPerThread, observation.getNrPeriods() / nrPeriodsPerThread);
-      cl::NDRange local(nrDMsPerBlock, nrPeriodsPerBlock);
+      global = cl::NDRange(observation.getNrPaddedDMs() / nrDMsPerThread, observation.getNrPeriods() / nrPeriodsPerThread);
+      local = cl::NDRange(nrDMsPerBlock, nrPeriodsPerBlock);
 
       kernel->setArg(0, foldedData_d);
       kernel->setArg(1, snrs_d);
