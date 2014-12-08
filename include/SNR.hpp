@@ -14,7 +14,6 @@
 
 #include <string>
 #include <cmath>
-#include <x86intrin.h>
 
 #include <utils.hpp>
 #include <Observation.hpp>
@@ -25,16 +24,12 @@
 
 namespace PulsarSearch {
 
-template< typename T > using snrFunc = void (*)(const AstroData::Observation &, const float *, float *);
-
 // Sequential SNR
 template< typename T > void snrDedispersedTS(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersedTS, std::vector< T > & maxS, std::vector< float > & meanS, std::vector< float > & rmsS);
 template< typename T > void snrFoldedTS(const AstroData::Observation & observation, const std::vector< T > & foldedTS, std::vector< T > & snrs);
 // OpenCL SNR
 std::string * getSNRDedispersedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrDMsPerThread, const std::string & dataType, const AstroData::Observation & observation);
 std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigned int nrPeriodsPerBlock, const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, const std::string & dataType, const AstroData::Observation & observation);
-// SIMD SNR
-std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi = false);
 
 
 // Implementations
@@ -242,98 +237,6 @@ std::string * getSNRFoldedOpenCL(const unsigned int nrDMsPerBlock, const unsigne
   code = isa::utils::replace(code, "<%STORE%>", *store_s, true);
   delete store_s;
 
-  return code;
-}
-
-std::string * getSNRSIMD(const unsigned int nrDMsPerThread, const unsigned int nrPeriodsPerThread, bool phi) {
-  std::string * code = new std::string();
-  std::string * computeTemplate = new std::string();
-
-  // Begin kernel's template
-  if ( !phi ) {
-    *code = "namespace PulsarSearch {\n"
-      "template< typename T > void snrAVX" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
-      "{\n"
-      "__m256 max = _mm256_setzero_ps();\n"
-      "__m256 average = _mm256_setzero_ps();\n"
-      "__m256 rms = _mm256_setzero_ps();\n"
-      "#pragma omp parallel for schedule(static)\n"
-      "for ( unsigned int period = 0; period < observation.getNrPeriods(); period += " + isa::utils::toString(nrPeriodsPerThread) + ") {\n"
-      "#pragma omp parallel for schedule(static)\n"
-      "for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm += " + isa::utils::toString(nrPeriodsPerThread) + " * 8) {\n"
-      "<%COMPUTE%>"
-      "}\n"
-      "}\n"
-      "}\n"
-      "}\n"
-      "}\n";
-    *computeTemplate = "max = _mm256_setzero_ps();\n"
-      "average = _mm256_setzero_ps();\n"
-      "rms = _mm256_setzero_ps();\n"
-      "\n"
-      "for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {\n"
-      "__m256 value = _mm256_load_ps(&(foldedData[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + ((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]));\n"
-      "\n"
-      "average = _mm256_add_ps(average, value);\n"
-      "rms = _mm256_add_ps(rms, _mm256_mul_ps(value, value));\n"
-      "max = _mm256_max_ps(max, value);\n"
-      "}\n"
-      "average = _mm256_div_ps(average, _mm256_set1_ps(observation.getNrBins()));\n"
-      "rms = _mm256_sqrt_ps(_mm256_div_ps(rms, _mm256_set1_ps(observation.getNrBins())));\n"
-      "_mm256_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]),_mm256_div_ps(_mm256_sub_ps(max, average), rms));\n";
-  } else {
-    *code = "namespace PulsarSearch {\n"
-      "template< typename T > void snrPhi" + isa::utils::toString(nrDMsPerThread) + "x" + isa::utils::toString(nrPeriodsPerThread) + "(const AstroData::Observation & observation, const float * const __restrict__ foldedData, float * const __restrict__ snrs) {\n"
-      "{\n"
-      "__m512 max = _mm512_setzero_ps();\n"
-      "__m512 average = _mm512_setzero_ps();\n"
-      "__m512 rms = _mm512_setzero_ps();\n"
-      "#pragma omp parallel for schedule(static)\n"
-      "for ( unsigned int period = 0; period < observation.getNrPeriods(); period += " + isa::utils::toString(nrPeriodsPerThread) + ") {\n"
-      "#pragma omp parallel for schedule(static)\n"
-      "for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm += " + isa::utils::toString(nrPeriodsPerThread) + " * 16) {\n"
-      "<%COMPUTE%>"
-      "}\n"
-      "}\n"
-      "}\n"
-      "}\n"
-      "}\n";
-    *computeTemplate = "max = _mm512_setzero_ps();\n"
-      "average = _mm512_setzero_ps();\n"
-      "rms = _mm512_setzero_ps();\n"
-      "\n"
-      "for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {\n"
-      "__m512 value = _mm512_load_ps(&(foldedData[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + ((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]));\n"
-      "\n"
-      "average = _mm512_add_ps(average, value);\n"
-      "rms = _mm512_add_ps(rms, _mm512_mul_ps(value, value));\n"
-      "max = _mm512_max_ps(max, value);\n"
-      "}\n"
-      "average = _mm512_div_ps(average, _mm512_set1_ps(observation.getNrBins()));\n"
-      "rms = _mm512_sqrt_ps(_mm512_div_ps(rms, _mm512_set1_ps(observation.getNrBins())));\n"
-      "_mm512_store_ps(&(snrs[((period + <%PERIOD_NUM%>) * observation.getNrPaddedDMs()) + dm + <%DM_NUM%>]),_mm512_div_ps(_mm512_sub_ps(max, average), rms));\n";
-  }
-  // End kernel's template
-
-  std::string * compute_s = new std::string();
-
-  for ( unsigned int period = 0; period < nrPeriodsPerThread; period++ ) {
-    std::string period_s = isa::utils::toString< unsigned int >(period);
-
-    for ( unsigned int dm = 0; dm < nrDMsPerThread; dm++ ) {
-      std::string dm_s = isa::utils::toString< unsigned int >(dm);
-      std::string * temp_s = 0;
-
-      temp_s = isa::utils::replace(computeTemplate, "<%PERIOD_NUM%>", period_s);
-      temp_s = isa::utils::replace(temp_s, "<%DM_NUM%>", dm_s, true);
-      compute_s->append(*temp_s);
-      delete temp_s;
-    }
-  }
-  code = isa::utils::replace(code, "<%COMPUTE%>", *compute_s, true);
-  delete compute_s;
-
-  delete computeTemplate;
   return code;
 }
 
