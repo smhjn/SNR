@@ -29,7 +29,7 @@ CL_DEPS := $(DEPS) $(OPENCL)/bin/Exceptions.o $(OPENCL)/bin/InitializeOpenCL.o $
 
 all: SNR.o SNRTest SNRTuning printCode
 
-SNR.o: $(UTILS)/bin/utils.o include/SNR.hpp src/SNR.cpp
+SNR.o: $(ASTRODATA)/bin/Observation.o $(UTILS)/bin/utils.o include/SNR.hpp src/SNR.cpp
 	$(CC) -o bin/SNR.o -c src/SNR.cpp $(CL_INCLUDES) $(CFLAGS)
 
 SNRTest: $(CL_DEPS) src/SNRTest.cpp
