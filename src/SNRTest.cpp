@@ -220,12 +220,12 @@ int main(int argc, char *argv[]) {
     
     clQueues->at(clDeviceID)[0].enqueueNDRangeKernel(*kernel, cl::NullRange, global, local, 0, 0);
     if ( dSNR ) {
-      PulsarSearch::snrDedispersedTS(0, observation, transposedData, maxS_c, meanS_c, rmsS_c);
+      PulsarSearch::snrDedispersed(0, observation, transposedData, maxS_c, meanS_c, rmsS_c);
       clQueues->at(clDeviceID)[0].enqueueReadBuffer(maxS_d, CL_TRUE, 0, maxS.size() * sizeof(dataType), reinterpret_cast< void * >(maxS.data()));
       clQueues->at(clDeviceID)[0].enqueueReadBuffer(meanS_d, CL_TRUE, 0, meanS.size() * sizeof(dataType), reinterpret_cast< void * >(meanS.data()));
       clQueues->at(clDeviceID)[0].enqueueReadBuffer(rmsS_d, CL_TRUE, 0, rmsS.size() * sizeof(dataType), reinterpret_cast< void * >(rmsS.data()));
     } else {
-      PulsarSearch::snrFoldedTS(observation, foldedData, snrs_c);
+      PulsarSearch::snrFolded(observation, foldedData, snrs_c);
       clQueues->at(clDeviceID)[0].enqueueReadBuffer(snrs_d, CL_TRUE, 0, snrs.size() * sizeof(dataType), reinterpret_cast< void * >(snrs.data()));
     }
   } catch ( cl::Error &err ) {
