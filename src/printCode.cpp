@@ -29,12 +29,10 @@
 
 int main(int argc, char *argv[]) {
   bool dSNR = false;
-  unsigned int nrDMsPerBlock = 0;
-  unsigned int nrPeriodsPerBlock = 0;
-  unsigned int nrDMsPerThread = 0;
-  unsigned int nrPeriodsPerThread = 0;
   std::string typeName;
 	AstroData::Observation observation;
+  PulsarSearch::snrDedispersedConf dConf;
+  PulsarSearch::snrFoldedConf fConf;
 
 	try {
     isa::utils::ArgumentList args(argc, argv);
@@ -45,12 +43,14 @@ int main(int argc, char *argv[]) {
     }
     typeName = args.getSwitchArgument< std::string >("-type");
     observation.setPadding(args.getSwitchArgument< unsigned int >("-padding"));
-    nrDMsPerBlock = args.getSwitchArgument< unsigned int >("-db");
-    nrDMsPerThread = args.getSwitchArgument< unsigned int >("-dt");
     if ( fSNR ) {
-      nrPeriodsPerBlock = args.getSwitchArgument< unsigned int >("-pb");
-      nrPeriodsPerThread = args.getSwitchArgument< unsigned int >("-pt");
+      fConf.setNrDMsPerBlock(args.getSwitchArgument< unsigned int >("-db"));
+      fConf.setNrDMsPerThread(args.getSwitchArgument< unsigned int >("-dt"));
+      fConf.setNrPeriodsPerBlock(args.getSwitchArgument< unsigned int >("-pb"));
+      fConf.setNrPeriodsPerThread(args.getSwitchArgument< unsigned int >("-pt"));
     } else {
+      dConf.setNrDMsPerBlock(args.getSwitchArgument< unsigned int >("-db"));
+      dConf.setNrDMsPerThread(args.getSwitchArgument< unsigned int >("-dt"));
       observation.setNrSamplesPerSecond(args.getSwitchArgument< unsigned int >("-samples"));
     }
 		observation.setDMRange(args.getSwitchArgument< unsigned int >("-dms"), 0.0, 0.0);
@@ -71,9 +71,9 @@ int main(int argc, char *argv[]) {
   // Generate kernel
   std::string * code;
   if ( dSNR ) {
-    code = PulsarSearch::getSNRDedispersedOpenCL(nrDMsPerBlock, nrDMsPerThread, typeName, observation);
+    code = PulsarSearch::getSNRDedispersedOpenCL(dConf, typeName, observation);
   } else {
-    code = PulsarSearch::getSNRFoldedOpenCL(nrDMsPerBlock, nrPeriodsPerBlock, nrDMsPerThread, nrPeriodsPerThread, typeName, observation);
+    code = PulsarSearch::getSNRFoldedOpenCL(fConf, typeName, observation);
   }
   std::cout << *code << std::endl;
 
