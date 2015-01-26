@@ -351,14 +351,14 @@ int main(int argc, char * argv[]) {
 
 void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * tranposedData, cl::Buffer * tranposedData_d, std::vector< dataType > * maxS, cl::Buffer * maxS_d, std::vector< dataType > * meanS, cl::Buffer * meanS_d, std::vector< dataType > * rmsS, cl::Buffer * rmsS_d) {
   try {
-    transposedData_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, transposedData->size() * sizeof(dataType), 0, 0);
-    maxS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, maxS->size() * sizeof(dataType), 0, 0);
-    meanS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, meanS->size() * sizeof(dataType), 0, 0);
-    rmsS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, rmsS->size() * sizeof(dataType), 0, 0);
-    clQueue->enqueueWriteBuffer(transposedData_d, CL_FALSE, 0, transposedData->size() * sizeof(dataType), reinterpret_cast< void * >(transposedData->data()));
-    clQueue->enqueueWriteBuffer(maxS_d, CL_FALSE, 0, maxS->size() * sizeof(dataType), reinterpret_cast< void * >(maxS->data()));
-    clQueue->enqueueWriteBuffer(meanS_d, CL_FALSE, 0, meanS->size() * sizeof(dataType), reinterpret_cast< void * >(meanS->data()));
-    clQueue->enqueueWriteBuffer(rmsS_d, CL_FALSE, 0, rmsS->size() * sizeof(dataType), reinterpret_cast< void * >(rmsS->data()));
+    *transposedData_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, transposedData->size() * sizeof(dataType), 0, 0);
+    *maxS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, maxS->size() * sizeof(dataType), 0, 0);
+    *meanS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, meanS->size() * sizeof(dataType), 0, 0);
+    *rmsS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, rmsS->size() * sizeof(dataType), 0, 0);
+    clQueue->enqueueWriteBuffer(*transposedData_d, CL_FALSE, 0, transposedData->size() * sizeof(dataType), reinterpret_cast< void * >(transposedData->data()));
+    clQueue->enqueueWriteBuffer(*maxS_d, CL_FALSE, 0, maxS->size() * sizeof(dataType), reinterpret_cast< void * >(maxS->data()));
+    clQueue->enqueueWriteBuffer(*meanS_d, CL_FALSE, 0, meanS->size() * sizeof(dataType), reinterpret_cast< void * >(meanS->data()));
+    clQueue->enqueueWriteBuffer(*rmsS_d, CL_FALSE, 0, rmsS->size() * sizeof(dataType), reinterpret_cast< void * >(rmsS->data()));
     clQueue->finish();
   } catch ( cl::Error & err ) {
     std::cerr << "OpenCL error: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
@@ -368,10 +368,10 @@ void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue
 
 void initializeDeviceMemoryF(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * foldedData, cl::Buffer * foldedData_d, std::vector< dataType > * snrs, cl::Buffer * snrs_d) {
   try {
-    foldedData_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, foldedData->size() * sizeof(dataType), 0, 0);
-    snrs_d = cl::Buffer(clContext, CL_MEM_WRITE_ONLY, snrs->size() * sizeof(dataType), 0, 0);
-    clQueue->enqueueWriteBuffer(foldedData_d, CL_FALSE, 0, foldedData->size() * sizeof(dataType), reinterpret_cast< void * >(foldedData->data()));
-    clQueue->enqueueWriteBuffer(snrs_d, CL_FALSE, 0, snrs->size() * sizeof(dataType), reinterpret_cast< void * >(snrs->data()));
+    *foldedData_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, foldedData->size() * sizeof(dataType), 0, 0);
+    *snrs_d = cl::Buffer(clContext, CL_MEM_WRITE_ONLY, snrs->size() * sizeof(dataType), 0, 0);
+    clQueue->enqueueWriteBuffer(*foldedData_d, CL_FALSE, 0, foldedData->size() * sizeof(dataType), reinterpret_cast< void * >(foldedData->data()));
+    clQueue->enqueueWriteBuffer(*snrs_d, CL_FALSE, 0, snrs->size() * sizeof(dataType), reinterpret_cast< void * >(snrs->data()));
     clQueue->finish();
   } catch ( cl::Error & err ) {
     std::cerr << "OpenCL error: " << isa::utils::toString< cl_int >(err.err()) << "." << std::endl;
