@@ -34,7 +34,7 @@ typedef float dataType;
 std::string typeName("float");
 
 
-void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * tranposedData, cl::Buffer * tranposedData_d, std::vector< dataType > * maxS, cl::Buffer * maxS_d, std::vector< dataType > * meanS, cl::Buffer * meanS_d, std::vector< dataType > * rmsS, cl::Buffer * rmsS_d);
+void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * transposedData, cl::Buffer * transposedData_d, std::vector< dataType > * maxS, cl::Buffer * maxS_d, std::vector< dataType > * meanS, cl::Buffer * meanS_d, std::vector< dataType > * rmsS, cl::Buffer * rmsS_d);
 void initializeDeviceMemoryF(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * foldedData, cl::Buffer * foldedData_d, std::vector< dataType > * snrs, cl::Buffer * snrs_d);
 
 int main(int argc, char * argv[]) {
@@ -349,7 +349,7 @@ int main(int argc, char * argv[]) {
 	return 0;
 }
 
-void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * tranposedData, cl::Buffer * tranposedData_d, std::vector< dataType > * maxS, cl::Buffer * maxS_d, std::vector< dataType > * meanS, cl::Buffer * meanS_d, std::vector< dataType > * rmsS, cl::Buffer * rmsS_d) {
+void initializeDeviceMemoryD(cl::Context & clContext, cl::CommandQueue * clQueue, std::vector< dataType > * transposedData, cl::Buffer * transposedData_d, std::vector< dataType > * maxS, cl::Buffer * maxS_d, std::vector< dataType > * meanS, cl::Buffer * meanS_d, std::vector< dataType > * rmsS, cl::Buffer * rmsS_d) {
   try {
     *transposedData_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, transposedData->size() * sizeof(dataType), 0, 0);
     *maxS_d = cl::Buffer(clContext, CL_MEM_READ_WRITE, maxS->size() * sizeof(dataType), 0, 0);
