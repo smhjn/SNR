@@ -98,10 +98,10 @@ int main(int argc, char * argv[]) {
 	std::vector< std::vector< cl::CommandQueue > > * clQueues = 0;
 
 	// Allocate memory
-  std::vector< dataType > foldedData, snrs;
   std::vector< dataType > transposedData, maxS, meanS, rmsS;
-  cl::Buffer foldedData_d, snrs_d;
+  std::vector< dataType > foldedData, snrs;
   cl::Buffer transposedData_d, maxS_d, meanS_d, rmsS_d;
+  cl::Buffer foldedData_d, snrs_d;
   if ( dSNR ) {
     transposedData.resize(observation.getNrSamplesPerSecond() * observation.getNrPaddedDMs());
     maxS.resize(observation.getNrPaddedDMs());
