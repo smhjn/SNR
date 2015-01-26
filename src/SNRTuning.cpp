@@ -184,7 +184,7 @@ int main(int argc, char * argv[]) {
           clQueues = new std::vector< std::vector< cl::CommandQueue > >();
           isa::OpenCL::initializeOpenCL(clPlatformID, 1, clPlatforms, &clContext, clDevices, clQueues);
           try {
-            initializeDeviceMemoryD(clContext, &(clQueues->at(clDeviceID)[0]), &foldedData, &foldedData_d, &maxS, &maxS_d, &meanS, &meanS_d, &rmsS, &rmsS_d);
+            initializeDeviceMemoryD(clContext, &(clQueues->at(clDeviceID)[0]), &transposedData, &transposedData_d, &maxS, &maxS_d, &meanS, &meanS_d, &rmsS, &rmsS_d);
           } catch ( cl::Error & err ) {
             return -1;
           }
@@ -281,7 +281,7 @@ int main(int argc, char * argv[]) {
               clQueues = new std::vector< std::vector< cl::CommandQueue > >();
               isa::OpenCL::initializeOpenCL(clPlatformID, 1, clPlatforms, &clContext, clDevices, clQueues);
               try {
-                initializeDeviceMemoryF(clContext, &(clQueues->at(clDeviceID)[0]), &transposedData, &transposedData_d, &snrs, &snrs_d);
+                initializeDeviceMemoryF(clContext, &(clQueues->at(clDeviceID)[0]), &foldedData, &foldedData_d, &snrs, &snrs_d);
               } catch ( cl::Error & err ) {
                 return -1;
               }
