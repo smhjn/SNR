@@ -25,7 +25,7 @@ snrFoldedConf::snrFoldedConf() {}
 snrFoldedConf::~snrFoldedConf() {}
 
 std::string snrDedispersedConf::print() const {
-  return std::string(isa::utils::toString(nrDMsPerBlock) + " " + isa::utils::toString(nrDMsPerPeriod));
+  return std::string(isa::utils::toString(nrDMsPerBlock) + " " + isa::utils::toString(nrDMsPerThread));
 }
 
 std::string sndFoldedConf::print() const {
