@@ -27,20 +27,20 @@ DEPS := $(ASTRODATA)/bin/Observation.o $(UTILS)/bin/ArgumentList.o $(UTILS)/bin/
 CL_DEPS := $(DEPS) $(OPENCL)/bin/Exceptions.o $(OPENCL)/bin/InitializeOpenCL.o $(OPENCL)/bin/Kernel.o 
 
 
-all: SNR.o SNRTest SNRTuning printCode
+all: bin/SNR.o bin/SNRTest bin/SNRTuning bin/printCode
 
-SNR.o: $(ASTRODATA)/bin/Observation.o $(UTILS)/bin/utils.o include/SNR.hpp src/SNR.cpp
+bin/SNR.o: $(ASTRODATA)/bin/Observation.o $(UTILS)/bin/utils.o include/SNR.hpp src/SNR.cpp
 	$(CC) -o bin/SNR.o -c src/SNR.cpp $(CL_INCLUDES) $(CFLAGS)
 
-SNRTest: $(CL_DEPS) src/SNRTest.cpp
+bin/SNRTest: $(CL_DEPS) src/SNRTest.cpp
 	$(CC) -o bin/SNRTest src/SNRTest.cpp $(CL_DEPS) $(CL_INCLUDES) $(CL_LIBS) $(CL_LDFLAGS) $(CFLAGS)
 
-SNRTuning: $(CL_DEPS) src/SNRTuning.cpp
+bin/SNRTuning: $(CL_DEPS) src/SNRTuning.cpp
 	$(CC) -o bin/SNRTuning src/SNRTuning.cpp $(CL_DEPS) $(CL_INCLUDES) $(CL_LIBS) $(CL_LDFLAGS) $(CFLAGS)
 
-printCode: $(DEPS) src/printCode.cpp
+bin/printCode: $(DEPS) src/printCode.cpp
 	$(CC) -o bin/printCode src/printCode.cpp $(DEPS) $(INCLUDES) $(LDFLAGS) $(CFLAGS)
 
 clean:
-	rm bin/*
+	-@rm bin/*
 
