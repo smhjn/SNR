@@ -62,7 +62,7 @@ private:
 };
 
 // Sequential SNR
-template< typename T > void snrDedispersed(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersed, std::vector< T > & maxS, std::vector< float > & meanS, std::vector< float > & rmsS);
+template< typename T > void snrDedispersed(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersed, std::vector< T > & maxS, std::vector< float > & meanS, std::vector< float > & varianceS);
 template< typename T > void snrFolded(const AstroData::Observation & observation, const std::vector< T > & folded, std::vector< T > & snrs);
 // OpenCL SNR
 std::string * getSNRDedispersedOpenCL(const snrDedispersedConf & conf, const std::string & dataType, const AstroData::Observation & observation);
@@ -102,18 +102,37 @@ inline void snrFoldedConf::setNrPeriodsPerThread(unsigned int periods) {
   nrPeriodsPerThread = periods;
 }
 
-template< typename T > void snrDedispersed(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersed, std::vector< T > & maxS, std::vector< float > & meanS, std::vector< float > & rmsS) {
+template< typename T > void snrDedispersed(const unsigned int second, const AstroData::Observation & observation, const std::vector< T > & dedispersed, std::vector< T > & maxS, std::vector< float > & meanS, std::vector< float > & varianceS) {
   for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
+    unsigned int nrElements = (second * observation.getNrSamplesPerSecond()) + 1;
     T max = 0;
     float mean = 0.0f;
-    float rms = 0.0f;
+    float variance = 0.0f;
 
-    for ( unsigned int sample = 0; sample < observation.getNrSamplesPerSecond(); sample++ ) {
+    if ( second == 0 ) {
+      T value = dedispersed[dm * observation.getNrSamplesPerPaddedSecond()];
+      max = value;
+      mean = value;
+    } else {
+      T value = dedispersed[dm * observation.getNrSamplesPerPaddedSecond()];
+      max = maxS[dm];
+      mean = meanS[dm];
+      variance = varianceS[dm];
+
+      mean += (value - mean) / nrElements;
+      variance += (value - meanS[dm]) * (value - mean);
+      if ( value > max ) {
+        max = value;
+      }
+    }
+
+    for ( unsigned int sample = 1; sample < observation.getNrSamplesPerSecond(); sample++ ) {
       T value = dedispersed[(dm * observation.getNrSamplesPerPaddedSecond()) + sample];
+      float oldMean = mean;
 
-      mean += value;
-      rms += (value * value);
-
+      nrElements++;
+      mean += (value - mean) / nrElements;
+      variance += (value - oldMean) * (value - mean);
       if ( value > max ) {
         max = value;
       }
@@ -122,32 +141,31 @@ template< typename T > void snrDedispersed(const unsigned int second, const Astr
     if ( max > maxS[dm] ) {
       maxS[dm] = max;
     }
-    meanS[dm] = ((meanS[dm] * observation.getNrSamplesPerSecond() * second) + mean) / (observation.getNrSamplesPerSecond() * (second + 1));
-    rmsS[dm] = ((rmsS[dm] * observation.getNrSamplesPerSecond() * second) + rms) / (observation.getNrSamplesPerSecond() * (second + 1));
+    meanS[dm] = mean;
+    varianceS[dm] = variance;
   }
 }
 
 template< typename T > void snrFolded(AstroData::Observation & observation, const std::vector< T > & folded, std::vector< T > & snrs) {
   for ( unsigned int period = 0; period < observation.getNrPeriods(); period++ ) {
     for ( unsigned int dm = 0; dm < observation.getNrDMs(); dm++ ) {
-			T max = 0;
-			float average = 0.0f;
-			float rms = 0.0f;
+			T max = folded[(period * observation.getNrPaddedDMs()) + dm];
+			float mean = folded[(period * observation.getNrPaddedDMs()) + dm];
+			float variance = 0.0f;
 
-			for ( unsigned int bin = 0; bin < observation.getNrBins(); bin++ ) {
+			for ( unsigned int bin = 1; bin < observation.getNrBins(); bin++ ) {
 				T value = folded[(bin * observation.getNrPeriods() * observation.getNrPaddedDMs()) + (period * observation.getNrPaddedDMs()) + dm];
+        float oldMean = mean;
 
-				average += value;
-				rms += (value * value);
-
+        mean += (value - mean) / (bin + 1);
+        variance += (value - oldMean) * (value - mean);
 				if ( value > max ) {
 					max = value;
 				}
 			}
-			average /= observation.getNrBins();
-			rms = std::sqrt(rms / observation.getNrBins());
+      variance /= observation.getNrBins() - 1;
 
-			snrs[(period * observation.getNrPaddedDMs()) + dm] = (max - average) / rms;
+			snrs[(period * observation.getNrPaddedDMs()) + dm] = (max - mean) / std::sqrt(variance);
 		}
 	}
 }
